@@ -478,8 +478,19 @@ async function startJob(itemId, typ) {
 async function retryJob(id) { await api("POST", `/api/jobs/${id}/retry`, {}); await refresh(); }
 async function delJob(id) { await api("DELETE", `/api/jobs/${id}`); await refresh(); }
 
+// Online nimmt Vercel höchstens 4,5 MB pro Anfrage an: große Fotos vorher verkleinern
+async function verkleinern(f) {
+  if (!f.type.startsWith("image/") || f.size < 3.5e6) return f;
+  const bild = await createImageBitmap(f);
+  const k = Math.min(1, 2600 / Math.max(bild.width, bild.height));
+  const c = Object.assign(document.createElement("canvas"), { width: bild.width * k, height: bild.height * k });
+  c.getContext("2d").drawImage(bild, 0, 0, c.width, c.height);
+  const blob = await new Promise((ok) => c.toBlob(ok, "image/jpeg", 0.85));
+  return new File([blob], f.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" });
+}
 async function upload(files, { item, rolle, owner }) {
-  for (const f of files) {
+  for (const original of files) {
+    const f = await verkleinern(original);
     const qs = new URLSearchParams({ item, rolle, owner, name: f.name });
     const r = await fetch(`/api/upload?${qs}`, { method: "POST", body: f });
     if (r.status === 401) return showLogin();
@@ -497,16 +508,16 @@ function bindDrop(el) {
   el.ondrop = (e) => { e.preventDefault(); el.classList.remove("over"); upload([...e.dataTransfer.files], target); };
 }
 
-// Polling: Worker-Status immer, Einträge nur solange Jobs laufen. Nicht neu rendern,
-// während jemand in ein Feld tippt — sonst ist die Eingabe weg.
+// Polling nur, solange Claude etwas tut: Jede Abfrage weckt online die Datenbank.
+// Nicht neu rendern, während jemand in ein Feld tippt — sonst ist die Eingabe weg.
 setInterval(async () => {
   if (document.hidden || !S.state) return;
   const busy = S.items.some((i) => i.jobs.some((j) => j.status === "offen" || j.status === "laeuft"));
+  if (!busy) return;
   const typing = ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName);
-  await loadState();
-  if (busy) await loadItems();
+  await loadItems();
   if (!(typing || S.newCourse || S.newItem || S.editItem || S.editCourse)) render();
-}, 5000);
+}, 15000);
 refresh();
 </script>
 </body>

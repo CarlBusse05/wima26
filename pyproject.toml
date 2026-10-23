@@ -1,0 +1,12 @@
+[project]
+name = "wima"
+version = "0.2.0"
+requires-python = ">=3.12"
+dependencies = [
+    "psycopg[binary]>=3.1,<4",
+]
+
+# Ohne diese Festlegung sucht der Vercel-Builder den Einstiegspunkt selbst
+# und nimmt dann server.py — den lokalen Entwicklungsserver.
+[tool.vercel]
+entrypoint = "api.index:handler"

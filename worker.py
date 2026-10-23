@@ -5,12 +5,13 @@ Wima-Worker: holt offene Jobs eines Nutzers vom Server und laesst sie von der
 LOKALEN Claude-Installation (`claude -p`) erledigen — kein API-Key noetig, es
 laeuft ueber das eigene Claude-Abo. Jeder Nutzer startet seinen eigenen Worker.
 
-  python3 worker.py --user Carl                    Dauerschleife (alle 15 s)
-  python3 worker.py --user Emil --server http://192.168.0.12:8790
+  python3 worker.py --user Carl                    gegen https://www.wima26.de, Dauerschleife
   python3 worker.py --user Carl --once             genau einen Job, dann Ende
+  python3 worker.py --user Carl --server http://127.0.0.1:8790    gegen einen lokalen server.py
 
-Anmeldung: Laeuft der Worker auf demselben Rechner wie der Server, reicht der Name.
-Sonst meldet er sich mit dem Wima-Passwort an (--passwort, WIMA_PASSWORT oder Abfrage).
+Anmeldung: Online fragt der Worker beim ersten Start nach dem Wima-Passwort (oder
+--passwort / WIMA_PASSWORT) und merkt sich danach nur den Login-Token in
+~/.config/wima/. Gegen einen lokalen Server auf demselben Rechner reicht der Name.
 
 Ablauf pro Job:
   1. Job beanspruchen (POST /api/worker/claim)
@@ -83,11 +84,27 @@ def call(server, method, path, body=None, raw=None):
 
 
 def anmelden(server, user, passwort):
-    if urlparse(server).hostname in ("127.0.0.1", "localhost", "::1"):
+    host = urlparse(server).hostname
+    if host in ("127.0.0.1", "localhost", "::1"):
         AUTH["X-Wima-Worker"] = user
         return
+    datei = os.path.join(os.path.expanduser("~/.config/wima"), f"{host}-{user}.token")
+    if not passwort and os.path.exists(datei):
+        with open(datei) as fh:
+            AUTH["Authorization"] = "Bearer " + fh.read().strip()
+        try:
+            call(server, "GET", "/api/state")
+            return
+        except urllib.error.HTTPError as e:
+            if e.code != 401:
+                raise
+            print("Gespeicherter Login abgelaufen, bitte neu anmelden.", flush=True)
     passwort = passwort or os.environ.get("WIMA_PASSWORT") or getpass.getpass(f"Wima-Passwort fuer {user}: ")
-    AUTH["Authorization"] = "Bearer " + call(server, "POST", "/api/login", {"user": user, "passwort": passwort})["token"]
+    token = call(server, "POST", "/api/login", {"user": user, "passwort": passwort})["token"]
+    AUTH["Authorization"] = "Bearer " + token
+    os.makedirs(os.path.dirname(datei), exist_ok=True)
+    with open(os.open(datei, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w") as fh:
+        fh.write(token)
 
 
 def fill(template, values):
@@ -213,9 +230,10 @@ def run_job(server, claim, keep):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--user", required=True)
-    ap.add_argument("--server", default=os.environ.get("WIMA_SERVER", "http://127.0.0.1:8790"))
-    ap.add_argument("--passwort", help="nur noetig, wenn der Server auf einem anderen Rechner laeuft")
-    ap.add_argument("--interval", type=int, default=15)
+    ap.add_argument("--server", default=os.environ.get("WIMA_SERVER", "https://www.wima26.de"))
+    ap.add_argument("--passwort", help="sonst wird beim ersten Start danach gefragt")
+    # Jede Abfrage weckt die Datenbank (Neon, kostenloses Kontingent) — nicht zu oft fragen
+    ap.add_argument("--interval", type=int, default=30)
     ap.add_argument("--once", action="store_true")
     ap.add_argument("--keep", action="store_true", help="Arbeitsordner auch bei Erfolg behalten")
     args = ap.parse_args()

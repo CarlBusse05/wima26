@@ -6,3 +6,9 @@ __pycache__/
 # Fehlerprofile sind privat
 wissen/personen/
 arbeit/
+.vercel
+.env*
+.venv/
+.agents/
+.claude/
+skills-lock.json

@@ -1,0 +1,17 @@
+# Daten liegen online in Postgres und Blob, nie im Deployment
+data/
+arbeit/
+wissen/personen/
+.env*
+
+# Laeuft nur auf den Rechnern von Carl und Emil
+worker.py
+start.sh
+prompts/
+tools/
+docs/
+.agents/
+.claude/
+skills-lock.json
+__pycache__/
+.venv/
