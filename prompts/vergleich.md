@@ -27,3 +27,7 @@ Schreibe `output/vergleich.md` mit diesem Aufbau:
 ```
 
 Sei genau und ehrlich, aber nicht kleinlich. Ein anderer korrekter Lösungsweg zählt als richtig.
+
+Danach: Trage die Fehler als abstrahierte Muster mit Beleg in `wissen/personen/{{USER}}.md`
+ein, z. B. „übersieht Fälle, in denen Variablen gleich sind (Blatt 1, A2)“. Ist ein Muster
+schon vorhanden, ergänze nur den Beleg. Ab zwei Belegen gilt es als **gesichert**.

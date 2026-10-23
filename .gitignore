@@ -2,3 +2,7 @@ data/
 __pycache__/
 *.pyc
 .DS_Store
+
+# Fehlerprofile sind privat
+wissen/personen/
+arbeit/

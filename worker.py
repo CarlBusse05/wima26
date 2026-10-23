@@ -9,14 +9,19 @@ laeuft ueber das eigene Claude-Abo. Jeder Nutzer startet seinen eigenen Worker.
   python3 worker.py --user Emil --server http://192.168.0.12:8790
   python3 worker.py --user Carl --once             genau einen Job, dann Ende
 
+Anmeldung: Laeuft der Worker auf demselben Rechner wie der Server, reicht der Name.
+Sonst meldet er sich mit dem Wima-Passwort an (--passwort, WIMA_PASSWORT oder Abfrage).
+
 Ablauf pro Job:
   1. Job beanspruchen (POST /api/worker/claim)
-  2. Eingabedateien nach arbeit/<job>/input/ laden
+  2. Eingabedateien nach arbeit/<job>/input/ und die Wissensbasis nach arbeit/<job>/wissen/ laden
   3. Prompt aus prompts/<typ>.md fuellen, `claude -p` im Job-Ordner starten
-  4. Alles aus arbeit/<job>/output/ hochladen, Job als fertig/fehler melden
+  4. Alles aus arbeit/<job>/output/ hochladen, geaenderte Wissensdateien zurueckschreiben,
+     Job als fertig/fehler melden
 """
 
 import argparse
+import getpass
 import json
 import os
 import shutil
@@ -26,27 +31,63 @@ import time
 import urllib.error
 import urllib.request
 from datetime import date
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 ARBEIT = os.path.join(DIR, "arbeit")
 PROMPTS = os.path.join(DIR, "prompts")
 TOOLS = os.path.join(DIR, "tools")
 CLAUDE_TOOLS = "Bash,Read,Write,Edit,Glob,Grep"
-TIMEOUT = 45 * 60
+TIMEOUT = 90 * 60
 
 ART_NAME = {"skript": "Skript", "uebung": "Übungsblatt", "tutorium": "Tutoriumsblatt",
             "sonstiges": "Material"}
 
+# Art-spezifische Teile von prompts/verbessern.md
+ABGLEICH = {
+    "skript": "Geh jede Aufgabe der Übungs- und Tutoriumsblätter in `input/kontext/` durch: Welche "
+              "Begriffe, Sätze und Techniken braucht sie? Stehen sie in diesem Original oder in früheren "
+              "Vorlesungen? Was fehlt oder zu knapp ist, wird ein Befund (Typ Lücke). Löse die Aufgaben dabei "
+              "nicht. Es geht nur darum, was der Stoff liefern muss.",
+    "blatt": "Bestimme für jede Aufgabe dieses Blatts die nötigen Begriffe, Sätze und Techniken und ihre "
+             "Fundstelle in den Vorlesungen in `input/kontext/`, mit Nummer. Fehlt etwas im Skript oder kommt "
+             "es erst später, wird das ein Befund und gehört in `stoff.md` (Abschnitt „Lücken“).",
+}
+SCHREIBEN = {
+    "skript": "Setze das **gesamte** Original in LaTeX neu: Gliederung, Nummerierung, Definitionen, Sätze, "
+              "Beweise und Beispiele vollständig und wörtlich. Deine Ergänzungen und Korrekturen baust du "
+              "nahtlos an der passenden Stelle ein (siehe unten). Was die Blätter brauchen (Schritt 2), "
+              "ergänzt du dort, wo der Begriff eingeführt wird, ohne auf die Blätter zu verweisen.",
+    "blatt": "Setze das Blatt vollständig und wörtlich neu, alle Aufgaben mit Punkten und Abgabehinweisen. "
+             "Präzisiere unklare oder mehrdeutige Formulierungen direkt im Aufgabentext und ergänze knapp "
+             "die Definition eines Begriffs, wo es hilft. Beides steht in Türkis, siehe unten. "
+             "**Keine Lösungshinweise.**",
+}
 
-def call(server, method, path, body=None, raw=None):
+
+AUTH = {}  # Header fuer alle Anfragen, siehe anmelden()
+
+
+def request(server, method, path, body=None, raw=None):
     data = raw if raw is not None else (json.dumps(body).encode() if body is not None else None)
-    req = urllib.request.Request(server + path, data=data, method=method)
+    req = urllib.request.Request(server + path, data=data, method=method, headers=AUTH)
     if body is not None:
         req.add_header("Content-Type", "application/json")
-    with urllib.request.urlopen(req, timeout=120) as r:
+    return urllib.request.urlopen(req, timeout=120)
+
+
+def call(server, method, path, body=None, raw=None):
+    with request(server, method, path, body, raw) as r:
         payload = r.read()
         return json.loads(payload) if payload else None
+
+
+def anmelden(server, user, passwort):
+    if urlparse(server).hostname in ("127.0.0.1", "localhost", "::1"):
+        AUTH["X-Wima-Worker"] = user
+        return
+    passwort = passwort or os.environ.get("WIMA_PASSWORT") or getpass.getpass(f"Wima-Passwort fuer {user}: ")
+    AUTH["Authorization"] = "Bearer " + call(server, "POST", "/api/login", {"user": user, "passwort": passwort})["token"]
 
 
 def fill(template, values):
@@ -64,24 +105,60 @@ def titel(item):
     return t
 
 
+def wissen_laden(server, ziel):
+    dateien = call(server, "GET", "/api/wissen")["dateien"]
+    for rel, text in dateien.items():
+        os.makedirs(os.path.dirname(os.path.join(ziel, rel)), exist_ok=True)
+        with open(os.path.join(ziel, rel), "w", encoding="utf-8") as fh:
+            fh.write(text)
+    return dateien
+
+
+def wissen_zurueck(server, ziel, vorher):
+    geaendert = []
+    for root, _, names in os.walk(ziel):
+        for n in names:
+            rel = os.path.relpath(os.path.join(root, n), ziel)
+            if not n.endswith(".md"):
+                continue
+            with open(os.path.join(ziel, rel), encoding="utf-8") as fh:
+                text = fh.read()
+            if vorher.get(rel) == text:
+                continue
+            try:
+                call(server, "PUT", "/api/wissen?" + urlencode({"pfad": rel}), raw=text.encode("utf-8"))
+                geaendert.append(rel)
+            except urllib.error.HTTPError as e:
+                print(f"  wissen/{rel} nicht übernommen ({e.code})", flush=True)
+    return geaendert
+
+
 def run_job(server, claim, keep):
     job, item, course = claim["job"], claim["item"], claim["course"]
     wd = os.path.join(ARBEIT, f"job{job['id']}")
     shutil.rmtree(wd, ignore_errors=True)
     for sub in ("input", "output", "work"):
         os.makedirs(os.path.join(wd, sub))
+    wissen_vorher = wissen_laden(server, os.path.join(wd, "wissen"))
 
     for f in claim["inputs"]:
         ziel = os.path.join(wd, "input", f["pfad"])
         os.makedirs(os.path.dirname(ziel), exist_ok=True)
-        urllib.request.urlretrieve(server + f["url"], ziel)
+        with request(server, "GET", f["url"]) as r, open(ziel, "wb") as fh:
+            shutil.copyfileobj(r, fh)
 
     with open(os.path.join(PROMPTS, "_basis.md"), encoding="utf-8") as fh:
         basis = fh.read()
     with open(os.path.join(PROMPTS, f"{job['typ']}.md"), encoding="utf-8") as fh:
         spezifisch = fh.read()
     eingaben = "\n".join(f"- input/{f['pfad']}" for f in claim["inputs"]) or "- (keine)"
+    art = "skript" if item["art"] == "skript" else "blatt"
+    endung = {"verbessern": "_verbessert", "lang": "_lang"}.get(job["typ"], f"_fuer_{job['owner']}")
+    stamm = (titel(item).split(" – ")[0] + endung).replace(" ", "_")
     prompt = fill(basis + "\n\n" + spezifisch, {
+        "ABGLEICH": ABGLEICH[art], "SCHREIBEN": SCHREIBEN[art],
+        "ORDNER": "skript" if item["art"] == "skript" else "aufgabe", "DATEINAME": stamm,
+        "KUERZEL": course.get("kuerzel") or f"kurs{course['id']}",
         "USER": job["owner"], "KURS": course["name"], "TITEL": titel(item),
         "ART": ART_NAME.get(item["art"], item["art"]), "NUMMER": item.get("nummer") or "",
         "DATUM": date.today().strftime("%d.%m.%Y"), "TOOLS": TOOLS,
@@ -122,6 +199,9 @@ def run_job(server, claim, keep):
         with open(pfad, "rb") as fh:
             call(server, "POST", f"/api/upload?{qs}", raw=fh.read())
 
+    geaendert = wissen_zurueck(server, os.path.join(wd, "wissen"), wissen_vorher)
+    if geaendert:
+        zusammenfassung += "\n\nWissensbasis aktualisiert: " + ", ".join(geaendert)
     dauer = f"{int(time.time() - t0)} s"
     call(server, "POST", f"/api/jobs/{job['id']}/{'fail' if fehler else 'done'}",
          {"ergebnis": f"{zusammenfassung}\n\n({dauer}, {len(ausgabe)} Datei(en))"})
@@ -134,6 +214,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--user", required=True)
     ap.add_argument("--server", default=os.environ.get("WIMA_SERVER", "http://127.0.0.1:8790"))
+    ap.add_argument("--passwort", help="nur noetig, wenn der Server auf einem anderen Rechner laeuft")
     ap.add_argument("--interval", type=int, default=15)
     ap.add_argument("--once", action="store_true")
     ap.add_argument("--keep", action="store_true", help="Arbeitsordner auch bei Erfolg behalten")
@@ -141,11 +222,12 @@ def main():
     server = args.server.rstrip("/")
     if not shutil.which("claude"):
         sys.exit("`claude` (Claude Code CLI) nicht gefunden.")
+    anmelden(server, args.user, args.passwort)
     print(f"Wima-Worker fuer {args.user} → {server}", flush=True)
 
     while True:
         try:
-            claim = call(server, "POST", "/api/worker/claim", {"user": args.user})
+            claim = call(server, "POST", "/api/worker/claim", {})
         except (urllib.error.URLError, OSError) as e:
             print(f"Server nicht erreichbar: {e}", flush=True)
             claim = None

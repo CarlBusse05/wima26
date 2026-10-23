@@ -17,6 +17,10 @@ und arbeite die Aufgabe vollständig ab.
 - `work/`: Zwischenergebnisse (wird nicht hochgeladen)
 - `output/`: NUR die fertigen Ergebnisdateien. Alles, was hier liegt, wird hochgeladen.
 - Hilfswerkzeuge: `{{TOOLS}}`
+- `wissen/`: die Wissensbasis von Wima, die über alle Läufe hinweg wächst. Lies
+  `wissen/README.md`. Änderungen an `wissen/pruefkatalog.md`, `wissen/kurse/{{KUERZEL}}/stoff.md`
+  und `wissen/personen/{{USER}}.md` werden nach dem Lauf automatisch übernommen.
+  `wissen/didaktik.md` ist verbindlich und wird nicht verändert.
 
 **Regeln**
 - PDFs und Bilder kannst du direkt mit dem Read-Tool ansehen.

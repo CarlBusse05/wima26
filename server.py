@@ -12,7 +12,12 @@ eigenen lokalen Claude-Installation. Der Server verteilt nur Jobs und Dateien.
   python3 server.py --port 9000      anderer Port
   python3 server.py --lan            auch im WLAN erreichbar (Handy-Upload, Emil)
 
-API:
+API (alles ausser /api/users und /api/login braucht eine Anmeldung:
+Cookie "wima", "Authorization: Bearer <token>" oder — nur von 127.0.0.1 —
+der Header "X-Wima-Worker: <Name>" fuer den lokalen Worker):
+  GET    /api/users                      -> {users:[{name, hat_passwort}]}
+  POST   /api/login                      <- {user, passwort}  (erstes Mal: legt Passwort fest)
+  POST   /api/logout
   GET    /api/state                      -> {users, courses, worker}
   POST   /api/courses                    <- {name, kuerzel, farbe, semester}
   PATCH  /api/courses/<id>               <- Teilfelder
@@ -27,20 +32,29 @@ API:
   POST   /api/jobs                       <- {item_id, typ, owner, hinweis}
   POST   /api/jobs/<id>/retry | /done | /fail
   DELETE /api/jobs/<id>
-  POST   /api/worker/claim               <- {user}  -> {job, kontext, inputs} oder 204
+  POST   /api/worker/claim               -> {job, kontext, inputs} oder 204
+  GET    /api/wissen                     -> {dateien:{pfad: text}}  (fremde Fehlerprofile ausgenommen)
+  PUT    /api/wissen?pfad=               Body = Text; nur pruefkatalog.md, kurse/**, personen/<ich>.md
 
-Alle Daten liegen in ./data (wima.db + files/). Keine Authentifizierung —
-gedacht fuer localhost bzw. ein vertrauenswuerdiges Netz.
+Automatik: Neues Original -> Job "verbessern" (Worker von WIMA_HAUPT, Standard: erster Nutzer);
+"verbessern"/"lang" fertig -> "personalisieren" fuer alle; "vergleich" fertig -> "personalisieren".
+
+Alle Daten liegen in ./data (wima.db + files/). Die Anmeldung trennt Carl und Emil,
+ist aber kein Schutz fuer offene Netze: nur localhost bzw. ein vertrauenswuerdiges WLAN.
 """
 
 import argparse
+import hashlib
+import hmac
 import json
 import mimetypes
 import os
 import re
+import secrets
 import sqlite3
 import threading
 from datetime import datetime
+from http.cookies import SimpleCookie
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from socketserver import ThreadingMixIn
 from urllib.parse import urlparse, parse_qs, quote
@@ -50,17 +64,20 @@ DATA = os.path.join(DIR, "data")
 FILES = os.path.join(DATA, "files")
 DB_PATH = os.path.join(DATA, "wima.db")
 PUBLIC = os.path.join(DIR, "public")
+WISSEN = os.path.join(DIR, "wissen")
 
 USERS = [u.strip() for u in os.environ.get("WIMA_USERS", "Carl,Emil").split(",") if u.strip()]
 ARTEN = ["skript", "uebung", "tutorium", "sonstiges"]
-ROLLEN = ["original", "musterloesung", "foto", "notiz",
+HAUPT = os.environ.get("WIMA_HAUPT") or USERS[0]  # erledigt die gemeinsamen Jobs
+ROLLEN = ["original", "musterloesung", "verbessert", "lang", "fuer", "foto", "notiz",
           "aufbereitet", "vergleich", "begleitskript", "herde"]
 JOB_TYPEN = {
     # typ: Rolle der Ergebnisdateien, Ergebnis gehoert dem Nutzer (False = allen)
     "aufbereiten":       ("aufbereitet", True),
     "vergleich":         ("vergleich", True),
-    "skript_verbessern": ("begleitskript", True),
-    "herde":             ("herde", False),
+    "verbessern":        ("verbessert", False),
+    "lang":              ("lang", False),
+    "personalisieren":   ("fuer", True),
 }
 MAX_UPLOAD = 200 * 1024 * 1024
 LOCK = threading.Lock()
@@ -68,7 +85,8 @@ LOCK = threading.Lock()
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS courses(
   id INTEGER PRIMARY KEY, name TEXT NOT NULL, kuerzel TEXT, farbe TEXT,
-  semester TEXT, pos INTEGER DEFAULT 0, created TEXT);
+  semester TEXT, pos INTEGER DEFAULT 0, created TEXT,
+  owner TEXT);  -- NULL = fuer alle, sonst nur fuer diesen Nutzer
 CREATE TABLE IF NOT EXISTS items(
   id INTEGER PRIMARY KEY,
   course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
@@ -84,7 +102,10 @@ CREATE TABLE IF NOT EXISTS jobs(
   typ TEXT NOT NULL, owner TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'offen',
   hinweis TEXT, ergebnis TEXT, created TEXT, started TEXT, finished TEXT);
 CREATE TABLE IF NOT EXISTS worker(user TEXT PRIMARY KEY, last_seen TEXT);
+CREATE TABLE IF NOT EXISTS logins(user TEXT PRIMARY KEY, salt TEXT, hash TEXT);
+CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY, user TEXT NOT NULL, created TEXT);
 """
+COOKIE_MAX_AGE = 365 * 24 * 3600
 
 
 def now():
@@ -102,6 +123,8 @@ def init_db():
     os.makedirs(FILES, exist_ok=True)
     with db() as con:
         con.executescript(SCHEMA)
+        if "owner" not in [r[1] for r in con.execute("PRAGMA table_info(courses)")]:
+            con.execute("ALTER TABLE courses ADD COLUMN owner TEXT")
 
 
 def rows(cur):
@@ -120,10 +143,48 @@ class ApiError(Exception):
         self.status = status
 
 
-# ---------------------------------------------------------------- Logik
-def state():
+# ---------------------------------------------------------------- Anmeldung
+def pw_hash(passwort, salt):
+    return hashlib.pbkdf2_hmac("sha256", passwort.encode(), bytes.fromhex(salt), 200_000).hex()
+
+
+def users_info():
     with db() as con:
-        courses = rows(con.execute("SELECT * FROM courses ORDER BY pos, id"))
+        gesetzt = {r["user"] for r in con.execute("SELECT user FROM logins")}
+    return {"users": [{"name": u, "hat_passwort": u in gesetzt} for u in USERS]}
+
+
+def login(body):
+    user, passwort = body.get("user"), body.get("passwort") or ""
+    if user not in USERS:
+        raise ApiError(400, "unbekannter Nutzer")
+    if len(passwort) < 4:
+        raise ApiError(400, "Passwort zu kurz (mind. 4 Zeichen)")
+    with db() as con:
+        row = con.execute("SELECT * FROM logins WHERE user=?", (user,)).fetchone()
+        if row is None:  # erste Anmeldung legt das Passwort fest
+            salt = secrets.token_hex(16)
+            con.execute("INSERT INTO logins(user,salt,hash) VALUES(?,?,?)", (user, salt, pw_hash(passwort, salt)))
+        elif not hmac.compare_digest(row["hash"], pw_hash(passwort, row["salt"])):
+            raise ApiError(401, "Falsches Passwort")
+        token = secrets.token_urlsafe(32)
+        con.execute("INSERT INTO sessions(token,user,created) VALUES(?,?,?)", (token, user, now()))
+    return {"user": user, "token": token}
+
+
+def session_user(token):
+    if not token:
+        return None
+    with db() as con:
+        row = con.execute("SELECT user FROM sessions WHERE token=?", (token,)).fetchone()
+    return row["user"] if row and row["user"] in USERS else None
+
+
+# ---------------------------------------------------------------- Logik
+def state(user):
+    with db() as con:
+        courses = rows(con.execute("SELECT * FROM courses WHERE owner IS NULL OR owner=? ORDER BY pos, id",
+                                   (user,)))
         worker = {r["user"]: r["last_seen"] for r in con.execute("SELECT * FROM worker")}
     return {"users": USERS, "arten": ARTEN, "courses": courses, "worker": worker, "now": now()}
 
@@ -156,9 +217,9 @@ def create_course(body):
         raise ApiError(400, "name fehlt")
     with db() as con:
         cur = con.execute(
-            "INSERT INTO courses(name,kuerzel,farbe,semester,pos,created) VALUES(?,?,?,?,?,?)",
+            "INSERT INTO courses(name,kuerzel,farbe,semester,pos,created,owner) VALUES(?,?,?,?,?,?,?)",
             (body["name"].strip(), body.get("kuerzel"), body.get("farbe"),
-             body.get("semester"), body.get("pos", 0), now()))
+             body.get("semester"), body.get("pos", 0), now(), body.get("owner")))
         return dict(con.execute("SELECT * FROM courses WHERE id=?", (cur.lastrowid,)).fetchone())
 
 
@@ -203,16 +264,14 @@ def create_item(body):
         return dict(con.execute("SELECT * FROM items WHERE id=?", (cur.lastrowid,)).fetchone())
 
 
-def save_upload(qs, data):
+def save_upload(qs, data, user):
     item = int(qs.get("item", ["0"])[0])
     rolle = qs.get("rolle", [""])[0]
-    owner = qs.get("owner", [""])[0] or None
+    owner = user if qs.get("owner", [""])[0] else None  # private Dateien gehoeren immer dem Angemeldeten
     job = qs.get("job", [""])[0] or None
     name = safe_name(qs.get("name", ["datei"])[0])
     if rolle not in ROLLEN:
         raise ApiError(400, f"rolle muss eins von {ROLLEN} sein")
-    if owner and owner not in USERS:
-        raise ApiError(400, "unbekannter owner")
     mime = mimetypes.guess_type(name)[0] or "application/octet-stream"
     with db() as con:
         if not con.execute("SELECT 1 FROM items WHERE id=?", (item,)).fetchone():
@@ -225,19 +284,39 @@ def save_upload(qs, data):
         with open(os.path.join(FILES, pfad), "wb") as fh:
             fh.write(data)
         con.execute("UPDATE files SET pfad=? WHERE id=?", (pfad, fid))
+        if rolle == "original" and not job:
+            queue_job(con, item, "verbessern", HAUPT)
         return dict(con.execute("SELECT * FROM files WHERE id=?", (fid,)).fetchone())
 
 
-def create_job(body):
+def queue_job(con, item_id, typ, owner, hinweis=None):
+    """Legt einen Job an, ausser es wartet schon derselbe (dann zaehlt der)."""
+    row = con.execute("SELECT id FROM jobs WHERE item_id=? AND typ=? AND owner=? AND status='offen'",
+                      (item_id, typ, owner)).fetchone()
+    if row:
+        return row["id"]
+    return con.execute("INSERT INTO jobs(item_id,typ,owner,hinweis,created) VALUES(?,?,?,?,?)",
+                       (item_id, typ, owner, hinweis, now())).lastrowid
+
+
+def create_job(body, user):
     if body.get("typ") not in JOB_TYPEN:
         raise ApiError(400, f"typ muss eins von {list(JOB_TYPEN)} sein")
-    if body.get("owner") not in USERS:
-        raise ApiError(400, "owner fehlt/unbekannt")
+    owner = HAUPT if not JOB_TYPEN[body["typ"]][1] else user  # gemeinsame Jobs macht HAUPT
     with db() as con:
-        cur = con.execute(
-            "INSERT INTO jobs(item_id,typ,owner,hinweis,created) VALUES(?,?,?,?,?)",
-            (body["item_id"], body["typ"], body["owner"], body.get("hinweis"), now()))
-        return dict(con.execute("SELECT * FROM jobs WHERE id=?", (cur.lastrowid,)).fetchone())
+        jid = queue_job(con, body["item_id"], body["typ"], owner, body.get("hinweis"))
+        return dict(con.execute("SELECT * FROM jobs WHERE id=?", (jid,)).fetchone())
+
+
+def folgejobs(con, job):
+    # "lang" startet (noch) nicht automatisch, erst testen wir es an Stochastik
+    if job["typ"] in ("verbessern", "lang"):
+        owner = con.execute("SELECT c.owner FROM courses c JOIN items i ON i.course_id=c.id WHERE i.id=?",
+                            (job["item_id"],)).fetchone()["owner"]
+        for u in ([owner] if owner else USERS):
+            queue_job(con, job["item_id"], "personalisieren", u)
+    elif job["typ"] == "vergleich":
+        queue_job(con, job["item_id"], "personalisieren", job["owner"])
 
 
 def job_status(job_id, status, ergebnis=None):
@@ -249,17 +328,17 @@ def job_status(job_id, status, ergebnis=None):
             con.execute("UPDATE jobs SET status=?, ergebnis=?, finished=? WHERE id=?",
                         (status, ergebnis, now(), job_id))
         row = con.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+        if row and status == "fertig":
+            folgejobs(con, row)
     if not row:
         raise ApiError(404, "Job nicht gefunden")
     return dict(row)
 
 
-def latest_per_owner(files):
-    """Von generierten Dateien nur die neueste Version je Nutzer behalten."""
-    out = {}
-    for f in files:
-        out[f["owner"]] = f
-    return list(out.values())
+def latest_job(files):
+    """Von generierten Dateien nur die des neuesten Jobs (z. B. .pdf + .tex)."""
+    last = max((f["job_id"] or 0 for f in files), default=None)
+    return [f for f in files if (f["job_id"] or 0) == last]
 
 
 def job_inputs(con, job, item):
@@ -272,25 +351,37 @@ def job_inputs(con, job, item):
 
     picks = []  # (unterordner, datei)
     add = lambda sub, lst: picks.extend((sub, f) for f in lst)
-    add("aufgabe" if item["art"] != "skript" else "skript", rolle("original"))
+    add("aufgabe" if item["art"] != "skript" else "skript", rolle("original")[-1:])  # nur die neueste Version
     if typ == "aufbereiten":
         add("fotos", rolle("foto", True))
     elif typ == "vergleich":
         add("musterloesung", rolle("musterloesung"))
         add("fotos", rolle("foto", True))
-        add("aufbereitet", latest_per_owner(rolle("aufbereitet", True)))
-    elif typ == "skript_verbessern":
-        add("notizen", rolle("notiz", True))
-        add("vorherige_version", latest_per_owner(rolle("begleitskript", True)))
+        add("aufbereitet", latest_job(rolle("aufbereitet", True)))
+    elif typ == "verbessern":
+        add("vorherige_version", latest_job(rolle("verbessert")))
         kontext = rows(con.execute(
             "SELECT f.*, i.art AS i_art, i.nummer AS i_nummer FROM files f "
             "JOIN items i ON f.item_id=i.id WHERE i.course_id=? AND i.id<>? "
-            "AND f.rolle='original' ORDER BY i.datum", (item["course_id"], item["id"])))
+            "AND f.rolle='original' AND f.id=(SELECT MAX(id) FROM files WHERE item_id=i.id AND rolle='original') "
+            "ORDER BY i.datum", (item["course_id"], item["id"])))
         add("kontext", kontext)
-    elif typ == "herde":
-        add("notizen", rolle("notiz"))
-        add("begleitskripte", latest_per_owner(rolle("begleitskript")))
-        add("vorherige_version", latest_per_owner(rolle("herde")))
+    elif typ == "lang":
+        add("verbessert", latest_job(rolle("verbessert")))
+        add("vorherige_version", latest_job(rolle("lang")))
+        kontext = rows(con.execute(
+            "SELECT f.*, i.art AS i_art, i.nummer AS i_nummer FROM files f "
+            "JOIN items i ON f.item_id=i.id WHERE i.course_id=? AND i.id<>? "
+            "AND f.rolle='original' AND f.id=(SELECT MAX(id) FROM files WHERE item_id=i.id AND rolle='original') "
+            "ORDER BY i.datum", (item["course_id"], item["id"])))
+        add("kontext", kontext)
+    elif typ == "personalisieren":
+        # Grundlage ist die ausfuehrlichste vorhandene Fassung: Lang, sonst Verbessert
+        add("verbessert", latest_job(rolle("lang")) or latest_job(rolle("verbessert")))
+        add("notizen", rolle("notiz", True))
+        add("vergleich", latest_job(rolle("vergleich", True)))
+        add("fotos", rolle("foto", True))
+        add("vorherige_version", latest_job(rolle("fuer", True)))
     out = []
     for sub, f in picks:
         prefix = f"{f['owner']}_" if f["owner"] else ""
@@ -301,10 +392,34 @@ def job_inputs(con, job, item):
     return out
 
 
-def claim(body):
-    user = body.get("user")
-    if user not in USERS:
-        raise ApiError(400, "user unbekannt")
+# ---------------------------------------------------------------- Wissensbasis
+def wissen_lesen(user):
+    out = {}
+    for root, _, names in os.walk(WISSEN):
+        for n in names:
+            if not n.endswith(".md"):
+                continue
+            rel = os.path.relpath(os.path.join(root, n), WISSEN)
+            if rel.startswith("personen/") and rel != f"personen/{user}.md":
+                continue  # Fehlerprofile sind privat
+            with open(os.path.join(WISSEN, rel), encoding="utf-8") as fh:
+                out[rel] = fh.read()
+    return {"dateien": out}
+
+
+def wissen_schreiben(pfad, text, user):
+    erlaubt = (pfad == "pruefkatalog.md" or pfad == f"personen/{user}.md"
+               or re.fullmatch(r"kurse/[\w\-]+/[\w\-]+\.md", pfad))
+    if not erlaubt or ".." in pfad:
+        raise ApiError(403, f"{pfad} darf nicht automatisch geaendert werden")
+    ziel = os.path.join(WISSEN, pfad)
+    os.makedirs(os.path.dirname(ziel), exist_ok=True)
+    with open(ziel, "w", encoding="utf-8") as fh:
+        fh.write(text)
+    return {"ok": True}
+
+
+def claim(user):
     with LOCK, db() as con:
         con.execute("INSERT INTO worker(user,last_seen) VALUES(?,?) "
                     "ON CONFLICT(user) DO UPDATE SET last_seen=excluded.last_seen", (user, now()))
@@ -352,19 +467,53 @@ class Handler(SimpleHTTPRequestHandler):
         raw = self.body_bytes()
         return json.loads(raw) if raw else {}
 
+    def token(self):
+        auth = self.headers.get("Authorization") or ""
+        if auth.startswith("Bearer "):
+            return auth[7:].strip()
+        c = SimpleCookie(self.headers.get("Cookie") or "")
+        return c["wima"].value if "wima" in c else None
+
+    def auth_user(self):
+        worker = self.headers.get("X-Wima-Worker")
+        if worker in USERS and self.client_address[0] in ("127.0.0.1", "::1"):
+            return worker  # lokaler Worker auf demselben Rechner
+        return session_user(self.token())
+
+    def send_login(self, res):
+        data = json.dumps(res, ensure_ascii=False).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Set-Cookie", f"wima={res['token']}; Path=/; Max-Age={COOKIE_MAX_AGE}; HttpOnly; SameSite=Lax")
+        self.end_headers()
+        self.wfile.write(data)
+        return True
+
     def route(self, method):
         u = urlparse(self.path)
         p, qs = u.path.rstrip("/"), parse_qs(u.query)
         parts = p.split("/")[1:]
         m = lambda pattern: re.fullmatch(pattern, p)
 
+        if not (p.startswith("/api") or m(r"/files/\d+")):
+            return False
+        if method == "GET" and p == "/api/users":
+            return self.send_json(users_info())
+        if method == "POST" and p == "/api/login":
+            return self.send_login(login(self.body_json()))
+        user = self.auth_user()
+        if not user:
+            raise ApiError(401, "nicht angemeldet")
+        if method == "POST" and p == "/api/logout":
+            with db() as con:
+                con.execute("DELETE FROM sessions WHERE token=?", (self.token(),))
+            return self.send_json({"ok": True})
         if method == "GET" and m(r"/files/\d+"):
             return self.serve_file(int(parts[1]))
-        if not p.startswith("/api"):
-            return False
 
         if method == "GET" and p == "/api/state":
-            return self.send_json(state())
+            return self.send_json(dict(state(user), user=user))
         if method == "POST" and p == "/api/courses":
             return self.send_json(create_course(self.body_json()))
         if m(r"/api/courses/\d+"):
@@ -386,11 +535,11 @@ class Handler(SimpleHTTPRequestHandler):
             if method == "DELETE":
                 return self.send_json(delete_with_files("items", iid))
         if method == "POST" and p == "/api/upload":
-            return self.send_json(save_upload(qs, self.body_bytes()))
+            return self.send_json(save_upload(qs, self.body_bytes(), user))
         if method == "DELETE" and m(r"/api/files/\d+"):
             return self.send_json(delete_with_files("files", int(parts[2])))
         if method == "POST" and p == "/api/jobs":
-            return self.send_json(create_job(self.body_json()))
+            return self.send_json(create_job(self.body_json(), user))
         if method == "POST" and m(r"/api/jobs/\d+/(retry|done|fail)"):
             jid, action = int(parts[2]), parts[3]
             body = self.body_json()
@@ -400,8 +549,13 @@ class Handler(SimpleHTTPRequestHandler):
             with db() as con:
                 con.execute("DELETE FROM jobs WHERE id=?", (int(parts[2]),))
             return self.send_json({"ok": True})
+        if method == "GET" and p == "/api/wissen":
+            return self.send_json(wissen_lesen(user))
+        if method == "PUT" and p == "/api/wissen":
+            return self.send_json(wissen_schreiben(qs.get("pfad", [""])[0],
+                                                   self.body_bytes().decode("utf-8"), user))
         if method == "POST" and p == "/api/worker/claim":
-            res = claim(self.body_json())
+            res = claim(user)
             if res is None:
                 self.send_response(204)
                 self.end_headers()
@@ -450,6 +604,9 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_DELETE(self):
         self.handle_any("DELETE")
+
+    def do_PUT(self):
+        self.handle_any("PUT")
 
 
 class Server(ThreadingMixIn, HTTPServer):
