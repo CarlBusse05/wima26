@@ -189,7 +189,8 @@ def run_job(server, claim, keep):
     proc = subprocess.run(
         ["claude", "-p", prompt, "--output-format", "json",
          "--allowedTools", CLAUDE_TOOLS, "--add-dir", TOOLS],
-        cwd=wd, capture_output=True, text=True, timeout=TIMEOUT)
+        cwd=wd, capture_output=True, text=True,
+        timeout=TIMEOUT * 2 if job["typ"] == "lang" else TIMEOUT)  # das Lernskript ist deutlich laenger
     with open(os.path.join(wd, "claude.log"), "w", encoding="utf-8") as fh:
         fh.write(proc.stdout + "\n--- stderr ---\n" + proc.stderr)
     try:

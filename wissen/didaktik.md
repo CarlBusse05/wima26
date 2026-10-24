@@ -37,33 +37,42 @@ Beweisen nicht. Deshalb gilt:
 - Alles Schwarze ist wörtlich das Original.
 - Lieber wenige treffende Ergänzungen als viele. Ist eine Stelle gut, bleibt sie unverändert.
 
-## Ebene „Lang“ (nur Vorlesungen)
+## Ebene „Lang“ (nur Vorlesungen): das Lernskript
 
-„Lang“ enthält alles aus „Verbessert“ und erklärt darüber hinaus so ausführlich, dass man
-den Stoff **ohne die Vorlesung** versteht. Auch wer in der Vorlesung war, soll damit beim
-ersten Durcharbeiten mitkommen. Das Ziel ist nicht, dass sich alles logisch anhört,
-sondern dass man es wirklich versteht.
+„Lang“ ist **neues Lernmaterial** zum Selbstlernen und keine erweiterte Kopie des Skripts.
+Grundlage ist „Verbessert“: Alle Korrekturen und Ergänzungen von dort sind enthalten (nicht
+markiert). Die Reihenfolge der Vorlesung bleibt, der Stoff wird aber substanziell neu
+aufbereitet. Ziel: Wer nicht in der Vorlesung war, kann sich den Stoff damit selbst
+beibringen, ohne sich durch ein dichtes PDF zu kämpfen.
 
-- **Vor jedem Beweis steht, was genau bewiesen wird.** Zuerst kommt „Zu zeigen:“ mit
-  Voraussetzungen und Behauptung, nochmal ausgeschrieben, damit man nicht nach oben
-  blättern muss. Danach folgt in ein bis drei Sätzen die **Beweisidee**: welche Strategie
-  (direkt, Widerspruch, Induktion, zwei Inklusionen …) und der entscheidende Trick.
-- **Jeder Beweisschritt ist begründet:** welche Definition, welcher Satz (mit Nummer),
-  welche Rechenregel. Dichte Schritte werden aufgefaltet. „Offensichtlich“, „analog“ und
-  „folgt sofort“ werden ausgeführt.
-  Beispiel: Die Bemerkung zu P(∅) = 0 im Stochastik-Skript zeigt nur P(∅) = Σ P(∅). Lang
-  sagt, warum daraus P(∅) = 0 folgt: Eine unendliche Summe aus lauter gleichen Zahlen
-  c ≥ 0 ist nur für c = 0 endlich, und P(∅) ≤ 1 ist endlich.
-- **Nach jeder Definition:** was sie anschaulich bedeutet, warum sie so aussieht und ein
-  kleines konkretes Beispiel (am besten endlich und durchgerechnet). Bei Bedarf kommt ein
-  Nicht-Beispiel dazu.
-- **Nach jedem Satz:** in einem Satz, was er aussagt und wofür man ihn braucht.
-- **Am Kapitelanfang** steht eine kurze Landkarte: Worum geht es, und wie hängt es mit dem
-  Vorherigen zusammen? **Am Kapitelende** folgt eine knappe Zusammenfassung der
-  wichtigsten Begriffe und Sätze.
-- **Notation:** Taucht ein Symbol lange nach seiner Definition wieder auf, erinnert ein
-  Halbsatz daran, was es bedeutet.
-- Form: **alles schwarz**. „Lang“ liest sich wie ein eigenes Lehrbuch, Ergänzungen sind
-  nicht farbig markiert. Sie stehen nahtlos im Fließtext, ohne Kästen und ohne
-  Meta-Kommentare.
-- Auch hier gilt: Übungsaufgaben werden nicht vorgelöst.
+**Aufbau**
+- **Kapitel** beginnen mit einer Startseite: Lernziele und eine Begriffskarte als Grafik
+  (welcher Begriff baut auf welchem auf). Sie enden mit einem **Spickzettel** (alle
+  Definitionen und Sätze kompakt) und den **Lösungen der Kurz-Checks**.
+- **Lerneinheiten:** ein Begriff oder ein Satz pro Einheit, jede auf einer neuen Seite,
+  meist 1–3 Seiten lang. Immer dasselbe Gerüst:
+  1. *Worum geht's?* Die Frage oder das Problem, das der Begriff löst.
+  2. Anschauung zuerst: Grafik oder kleines Beispiel, **bevor** die Formel kommt.
+  3. Definition bzw. Satz im Kasten, mit Verweis auf die Nummer im Skript.
+  4. Durchgerechnetes Beispiel und, wo es hilft, ein Gegenbeispiel (Was passiert ohne
+     die Voraussetzung?).
+  5. Beweis: „Zu zeigen“, Idee, dann nummerierte Schritte mit der Begründung daneben
+     (Definition, Satznummer, Rechenregel). „Offensichtlich“ und „analog“ werden ausgeführt.
+  6. Stolperfallen: Randfälle und typische Fehler.
+  7. Kurz-Check: 2–3 Verständnisfragen, Lösungen am Kapitelende.
+  8. Merke: ein Satz zum Mitnehmen.
+- Ganz hinten: Glossar und Symboltabelle.
+
+**Grafiken** (TikZ/pgfplots) nur, wo sie etwas zeigen, das Text schlechter erklärt:
+Venn-Diagramme für Mengen und Ereignisse, Mengensysteme, Funktionsgraphen (z. B.
+Verteilungsfunktionen mit Sprüngen und flachen Stücken), monotone Mengenfolgen,
+Baumdiagramme, Maß als Fläche bzw. Gewicht. Keine Deko.
+
+**Optik und Ton**
+- Feste Farben pro Kastenart (siehe `tools/vorlage_lernskript.tex`). Hier sind Kästen das
+  Gerüst des Dokuments und kein Anhang.
+- Luftig: wenig pro Seite, kurze Absätze, lieber mehr Seiten.
+- Du-Ansprache, direkt und einfach („Stell dir vor …“), aber mathematisch exakt.
+
+**Grenzen:** Übungsaufgaben werden nicht vorgelöst, auch nicht in Beispielen oder
+Kurz-Checks. Die Kurz-Checks prüfen Verständnis, sie sind keine Übungsaufgaben.
