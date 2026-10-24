@@ -153,9 +153,13 @@ def wissen_zurueck(server, ziel, vorher):
 def run_job(server, claim, keep):
     job, item, course = claim["job"], claim["item"], claim["course"]
     wd = os.path.join(ARBEIT, f"job{job['id']}")
-    shutil.rmtree(wd, ignore_errors=True)
+    # Wurde derselbe Job schon einmal abgebrochen (z. B. Claude-Limit), bleibt work/ erhalten
+    # und Claude macht dort weiter, statt von vorn anzufangen.
+    fortsetzen = os.path.isdir(os.path.join(wd, "work")) and bool(os.listdir(os.path.join(wd, "work")))
+    for sub in ("input", "output", "wissen") + (() if fortsetzen else ("work",)):
+        shutil.rmtree(os.path.join(wd, sub), ignore_errors=True)
     for sub in ("input", "output", "work"):
-        os.makedirs(os.path.join(wd, sub))
+        os.makedirs(os.path.join(wd, sub), exist_ok=True)
     wissen_vorher = wissen_laden(server, os.path.join(wd, "wissen"))
 
     for f in claim["inputs"]:
@@ -181,6 +185,11 @@ def run_job(server, claim, keep):
         "DATUM": date.today().strftime("%d.%m.%Y"), "TOOLS": TOOLS,
         "EINGABEN": eingaben, "HINWEIS": job.get("hinweis") or "(kein Hinweis)",
     })
+    if fortsetzen:
+        prompt += ("\n\n## Fortsetzung\nDieser Auftrag wurde schon einmal begonnen und abgebrochen. In "
+                   "`work/` liegt der bisherige Stand (Plan, Zwischendateien). Prüfe zuerst, was fertig ist, "
+                   "und setze genau dort fort. Mach nichts doppelt und fang nicht von vorn an.")
+        print(f"[job {job['id']}] setzt den abgebrochenen Stand in work/ fort", flush=True)
     with open(os.path.join(wd, "prompt.md"), "w", encoding="utf-8") as fh:
         fh.write(prompt)
 
