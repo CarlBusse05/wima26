@@ -18,7 +18,7 @@ Cookie "wima" oder "Authorization: Bearer <token>"; lokal zusaetzlich — nur vo
 127.0.0.1 — der Header "X-Wima-Worker: <Name>" fuer den Worker auf demselben Rechner):
   GET    /api/health
   GET    /api/users                      -> {users:[{name, hat_passwort}]}
-  POST   /api/login                      <- {user, passwort}  (erstes Mal: legt Passwort fest)
+  POST   /api/login                      <- {user, passwort}  (Nutzername klein oder gross)
   POST   /api/logout
   GET    /api/state                      -> {user, users, courses, worker}
   POST   /api/courses                    <- {name, kuerzel, farbe, semester, owner?}
@@ -118,18 +118,15 @@ def users_info():
 
 
 def login(body):
-    user, passwort = body.get("user"), body.get("passwort") or ""
-    if user not in USERS:
-        raise ApiError(400, "unbekannter Nutzer")
-    if len(passwort) < 4:
-        raise ApiError(400, "Passwort zu kurz (mind. 4 Zeichen)")
+    # Nutzername ohne Ruecksicht auf Gross-/Kleinschreibung: "carl" -> "Carl"
+    name = (body.get("user") or "").strip().lower()
+    user = next((u for u in USERS if u.lower() == name), None)
+    passwort = body.get("passwort") or ""
     with db() as con:
-        row = one(con.execute("SELECT * FROM logins WHERE nutzer=?", (user,)))
-        if row is None:  # erste Anmeldung legt das Passwort fest
-            salt = secrets.token_hex(16)
-            con.execute("INSERT INTO logins(nutzer,salt,hash) VALUES(?,?,?)", (user, salt, pw_hash(passwort, salt)))
-        elif not hmac.compare_digest(row["hash"], pw_hash(passwort, row["salt"])):
-            raise ApiError(401, "Falsches Passwort")
+        row = user and one(con.execute("SELECT * FROM logins WHERE nutzer=?", (user,)))
+        # Passwoerter werden von Hand gesetzt (siehe tools/passwort.py), nicht beim ersten Login
+        if not row or not hmac.compare_digest(row["hash"], pw_hash(passwort, row["salt"])):
+            raise ApiError(401, "Nutzername oder Passwort falsch")
         token = secrets.token_urlsafe(32)
         con.execute("INSERT INTO sessions(token,nutzer,created) VALUES(?,?,?)", (token, user, now()))
     return {"user": user, "token": token}

@@ -10,8 +10,8 @@ jedes Nutzers** über `claude -p`. Dafür braucht es keinen API-Key.
     python3 server.py --lan      # nur Server, auch im WLAN (Handy-Upload, Emil)
     python3 worker.py --user Emil --server http://<Carls-IP>:8790   # Emil, auf seinem Mac (fragt nach seinem Passwort)
 
-Anmeldung: Beim ersten Login legt jeder sein Passwort fest. Ein Worker auf demselben
-Rechner wie der Server braucht kein Passwort, ein entfernter Worker meldet sich damit an.
+Anmeldung mit Nutzername (`carl` / `emil`) und Passwort. Passwörter werden von Hand gesetzt:
+`uv run --python 3.12 --with "psycopg[binary]" tools/passwort.py Carl`.
 
 Voraussetzungen: Python 3.9+, `claude` (Claude Code, eingeloggt), `uv` und `tectonic`
 (`brew install uv tectonic`).

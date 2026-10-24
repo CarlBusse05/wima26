@@ -37,10 +37,6 @@ header { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, va
 .bar { max-width: 1040px; margin: 0 auto; padding: 12px 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .bar #logout { margin-left: auto; }
 .login { max-width: 340px; margin: 12vh auto 0; display: grid; gap: 10px; }
-.login .seg { display: flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; background: var(--panel); }
-.login .seg button { flex: 1; border: 0; border-radius: 0; padding: 8px 12px; }
-.login .seg button.on { background: var(--ink); color: var(--bg); }
-.login .hint { font-size: 13px; color: var(--muted); margin: 0; }
 .login .err { font-size: 13px; color: var(--err); margin: 0; }
 
 main { max-width: 1040px; margin: 0 auto; padding: 16px 16px 80px; }
@@ -221,30 +217,27 @@ async function refresh() { await loadState(); await loadItems(); render(); }
 // ---------------------------------------------------------------- Anmeldung
 async function showLogin() {
   S.state = null;
-  const users = (await (await fetch("/api/users")).json()).users;
-  S.login = { users, user: S.login?.user || store.get("lastUser", users[0].name), err: "" };
+  S.login = { name: S.login?.name ?? store.get("lastUser", ""), err: "" };
   renderLogin();
 }
 function renderLogin() {
   const L = S.login;
   $("#header").hidden = true;
   ["#courses", "#newCourse", "#course"].forEach((s) => $(s).innerHTML = "");
-  const neu = !L.users.find((u) => u.name === L.user)?.hat_passwort;
   $("#login").innerHTML = `<form class="panel login" onsubmit="event.preventDefault();doLogin()">
-    <div class="seg">${L.users.map((u) => `<button type="button" class="${u.name === L.user ? "on" : ""}"
-      onclick="S.login.user='${esc(u.name)}';S.login.err='';renderLogin()">${esc(u.name)}</button>`).join("")}</div>
-    <input type="password" id="pw" placeholder="${neu ? "Neues Passwort festlegen" : "Passwort"}" autocomplete="${neu ? "new-password" : "current-password"}">
-    ${neu ? `<p class="hint">Erste Anmeldung: Das Passwort, das du jetzt eingibst, gilt ab sofort.</p>` : ""}
+    <input type="text" id="un" placeholder="Nutzername" autocomplete="username" autocapitalize="none" value="${esc(L.name)}">
+    <input type="password" id="pw" placeholder="Passwort" autocomplete="current-password">
     ${L.err ? `<p class="err">${esc(L.err)}</p>` : ""}
     <button class="primary" type="submit">Anmelden</button>
   </form>`;
-  $("#pw").focus();
+  (L.name ? $("#pw") : $("#un")).focus();
 }
 async function doLogin() {
+  S.login.name = $("#un").value.trim();
   const r = await fetch("/api/login", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ user: S.login.user, passwort: $("#pw").value }) });
+    body: JSON.stringify({ user: S.login.name, passwort: $("#pw").value }) });
   if (!r.ok) { S.login.err = (await r.json()).error; return renderLogin(); }
-  store.set("lastUser", S.login.user);
+  store.set("lastUser", S.login.name);
   S.login = null; $("#login").innerHTML = "";
   await refresh();
 }
