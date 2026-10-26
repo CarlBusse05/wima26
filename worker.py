@@ -174,7 +174,8 @@ def run_job(server, claim, keep):
         spezifisch = fh.read()
     eingaben = "\n".join(f"- input/{f['pfad']}" for f in claim["inputs"]) or "- (keine)"
     art = "skript" if item["art"] == "skript" else "blatt"
-    endung = {"verbessern": "_verbessert", "lang": "_lang"}.get(job["typ"], f"_fuer_{job['owner']}")
+    endung = {"verbessern": "_verbessert", "lang": "_lang", "loesung": "_Loesung"}.get(
+        job["typ"], f"_fuer_{job['owner']}")
     stamm = (titel(item).split(" – ")[0] + endung).replace(" ", "_")
     prompt = fill(basis + "\n\n" + spezifisch, {
         "ABGLEICH": ABGLEICH[art], "SCHREIBEN": SCHREIBEN[art],

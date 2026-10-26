@@ -4,7 +4,7 @@
 Wima — Lernplattform fuer Carls und Emils Mathe-Kurse.
 
 JSON-API + Job-Queue. Die agentischen Aufgaben (verbessern, lang, personalisieren,
-aufbereiten, vergleich) erledigt NICHT der Server, sondern der Worker (worker.py) jedes
+aufbereiten, vergleich, loesung) erledigt NICHT der Server, sondern der Worker (worker.py) jedes
 Nutzers mit seiner eigenen lokalen Claude-Installation. Der Server verteilt nur Jobs und
 Dateien.
 
@@ -28,7 +28,8 @@ Cookie "wima" oder "Authorization: Bearer <token>"; lokal zusaetzlich — nur vo
   POST   /api/items                      <- {course_id, art, nummer, titel, datum}
   PATCH  /api/items/<id>                 <- Teilfelder
   DELETE /api/items/<id>
-  POST   /api/upload?item=&rolle=&owner=&name=[&job=]   Body = rohe Datei
+  POST   /api/upload?item=&rolle=&owner=&name=[&job=][&prio=1][&spaeter=1]   Body = rohe Datei
+  PATCH  /api/files/<id>                 <- {prio}  (nur Loesungsteile)
   DELETE /api/files/<id>
   GET    /files/<id>                     Datei selbst
   POST   /api/jobs                       <- {item_id, typ, hinweis}
@@ -39,6 +40,8 @@ Cookie "wima" oder "Authorization: Bearer <token>"; lokal zusaetzlich — nur vo
   PUT    /api/wissen?pfad=               Body = Text; nur pruefkatalog.md, kurse/**, personen/<ich>.md
 
 Automatik: Neues Original -> Job "verbessern" (Worker von WIMA_HAUPT, Standard: erster Nutzer);
+neuer/geloeschter/umgeschalteter Loesungsteil -> Job "loesung" (spaeter=1: noch kein Job, weitere
+Dateien folgen);
 "verbessern"/"lang" fertig -> "personalisieren" fuer alle; "vergleich" fertig -> "personalisieren".
 """
 
@@ -69,7 +72,7 @@ USERS = [u.strip() for u in os.environ.get("WIMA_USERS", "Carl,Emil").split(",")
 ARTEN = ["skript", "uebung", "tutorium", "sonstiges"]
 HAUPT = os.environ.get("WIMA_HAUPT") or USERS[0]  # erledigt die gemeinsamen Jobs
 ROLLEN = ["original", "musterloesung", "verbessert", "lang", "fuer", "foto", "notiz",
-          "aufbereitet", "vergleich", "begleitskript", "herde"]
+          "aufbereitet", "vergleich", "begleitskript", "herde", "loesungsteil", "loesung"]
 JOB_TYPEN = {
     # typ: Rolle der Ergebnisdateien, Ergebnis gehoert dem Nutzer (False = allen)
     "aufbereiten":       ("aufbereitet", True),
@@ -77,6 +80,7 @@ JOB_TYPEN = {
     "verbessern":        ("verbessert", False),
     "lang":              ("lang", False),
     "personalisieren":   ("fuer", True),
+    "loesung":           ("loesung", False),
 }
 # Vercel nimmt hoechstens 4,5 MB pro Anfrage an; Fotos verkleinert die Oberflaeche vorher.
 MAX_UPLOAD = int(4.4 * 1024 * 1024) if ONLINE else 200 * 1024 * 1024
@@ -159,7 +163,7 @@ def course_items(course_id, user):
         ids = [i["id"] for i in items] or [-1]
         marks = ",".join("?" * len(ids))
         files = rows(con.execute(
-            f"SELECT id,item_id,rolle,owner,name,mime,groesse,job_id,created FROM files "
+            f"SELECT id,item_id,rolle,owner,name,mime,groesse,job_id,created,prio FROM files "
             f"WHERE item_id IN ({marks}) ORDER BY id", ids))
         jobs = rows(con.execute(
             f"SELECT * FROM jobs WHERE item_id IN ({marks}) ORDER BY id DESC", ids))
@@ -227,19 +231,44 @@ def save_upload(qs, data, user):
     owner = user if qs.get("owner", [""])[0] else None  # private Dateien gehoeren immer dem Angemeldeten
     job = int(qs.get("job", [""])[0] or 0) or None
     name = safe_name(qs.get("name", ["datei"])[0])
+    prio = 1 if rolle == "loesungsteil" and qs.get("prio", [""])[0] == "1" else 0
     if rolle not in ROLLEN:
         raise ApiError(400, f"rolle muss eins von {ROLLEN} sein")
     mime = mimetypes.guess_type(name)[0] or "application/octet-stream"
     with db() as con:
         if not one(con.execute("SELECT 1 AS x FROM items WHERE id=?", (item,))):
             raise ApiError(404, "Eintrag nicht gefunden")
-        fid = insert(con, "INSERT INTO files(item_id,rolle,owner,name,mime,groesse,job_id,created) "
-                          "VALUES(?,?,?,?,?,?,?,?)", (item, rolle, owner, name, mime, len(data), job, now()))
+        fid = insert(con, "INSERT INTO files(item_id,rolle,owner,name,mime,groesse,job_id,created,prio) "
+                          "VALUES(?,?,?,?,?,?,?,?,?)", (item, rolle, owner, name, mime, len(data), job, now(), prio))
         pfad = store.datei_speichern(fid, name, data, mime)
         con.execute("UPDATE files SET pfad=? WHERE id=?", (pfad, fid))
         if rolle == "original" and not job:
             queue_job(con, item, "verbessern", HAUPT)
+        if rolle == "loesungsteil" and not qs.get("spaeter"):
+            queue_job(con, item, "loesung", HAUPT)
         return one(con.execute("SELECT * FROM files WHERE id=?", (fid,)))
+
+
+def set_prio(fid, body):
+    with db() as con:
+        f = one(con.execute("SELECT * FROM files WHERE id=?", (fid,)))
+        if not f or f["rolle"] != "loesungsteil":
+            raise ApiError(404, "Lösungsteil nicht gefunden")
+        con.execute("UPDATE files SET prio=? WHERE id=?", (1 if body.get("prio") else 0, fid))
+        queue_job(con, f["item_id"], "loesung", HAUPT)
+        return one(con.execute("SELECT * FROM files WHERE id=?", (fid,)))
+
+
+def delete_file(fid):
+    with db() as con:
+        f = one(con.execute("SELECT item_id, rolle FROM files WHERE id=?", (fid,)))
+    res = delete_with_files("files", fid)
+    if f and f["rolle"] == "loesungsteil":
+        with db() as con:  # Loesung ohne den geloeschten Teil neu bauen, falls noch Teile da sind
+            if one(con.execute("SELECT 1 AS x FROM files WHERE item_id=? AND rolle='loesungsteil'",
+                               (f["item_id"],))):
+                queue_job(con, f["item_id"], "loesung", HAUPT)
+    return res
 
 
 def queue_job(con, item_id, typ, owner, hinweis=None):
@@ -334,9 +363,14 @@ def job_inputs(con, job, item):
         add("vergleich", latest_job(rolle("vergleich", True)))
         add("fotos", rolle("foto", True))
         add("vorherige_version", latest_job(rolle("fuer", True)))
+    elif typ == "loesung":
+        add("teile", rolle("loesungsteil"))
+        add("vorherige_version", [f for f in latest_job(rolle("loesung")) if f["name"].endswith(".tex")])
     out = []
     for sub, f in picks:
         prefix = f"{f['owner']}_" if f["owner"] else ""
+        if sub == "teile" and f.get("prio"):
+            prefix = "prio_"
         if sub == "kontext":
             prefix = f"{f['i_art']}{f['i_nummer'] or ''}_"
         out.append({"id": f["id"], "pfad": f"{sub}/{prefix}{f['id']}_{f['name']}",
@@ -478,8 +512,10 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.send_json(delete_with_files("items", iid))
         if method == "POST" and p == "/api/upload":
             return self.send_json(save_upload(qs, self.body_bytes(), user))
+        if method == "PATCH" and m(r"/api/files/\d+"):
+            return self.send_json(set_prio(int(parts[2]), self.body_json()))
         if method == "DELETE" and m(r"/api/files/\d+"):
-            return self.send_json(delete_with_files("files", int(parts[2])))
+            return self.send_json(delete_file(int(parts[2])))
         if method == "POST" and p == "/api/jobs":
             return self.send_json(create_job(self.body_json(), user))
         if method == "POST" and m(r"/api/jobs/\d+/(retry|done|fail)"):

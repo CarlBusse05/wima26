@@ -45,7 +45,8 @@ CREATE TABLE IF NOT EXISTS files(
   id {ID},
   item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
   rolle TEXT NOT NULL, owner TEXT, name TEXT, mime TEXT, pfad TEXT,
-  groesse INTEGER, job_id INTEGER, created TEXT);
+  groesse INTEGER, job_id INTEGER, created TEXT,
+  prio INTEGER DEFAULT 0);  -- 1 = beim Job "loesung" vorziehen (z. B. Lehrerloesung)
 CREATE TABLE IF NOT EXISTS jobs(
   id {ID},
   item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
@@ -125,6 +126,7 @@ def init_db():
     if PG:
         with db() as con:
             con.raw.execute(SCHEMA.replace("{ID}", "BIGSERIAL PRIMARY KEY"))
+            con.raw.execute("ALTER TABLE files ADD COLUMN IF NOT EXISTS prio INTEGER DEFAULT 0")
         return
     os.makedirs(FILES, exist_ok=True)
     with db() as con:
@@ -136,6 +138,8 @@ def init_db():
         con.raw.executescript(SCHEMA.replace("{ID}", "INTEGER PRIMARY KEY"))
         if "owner" not in cols("courses"):
             con.raw.execute("ALTER TABLE courses ADD COLUMN owner TEXT")
+        if "prio" not in cols("files"):
+            con.raw.execute("ALTER TABLE files ADD COLUMN prio INTEGER DEFAULT 0")
 
 
 # ---------------------------------------------------------------- Dateien

@@ -1,0 +1,41 @@
+% Vorlage fuer "Lösung": die saubere, getippte Loesung eines Uebungs- oder Tutoriumsblatts.
+% Platzhalter: TITEL, KURS, STAND.
+% Pro Aufgabe: \aufgabe{Nummer}{Punkte oder leer}, dann pro Teilaufgabe
+%   \teil{a)}  (entfaellt bei Aufgaben ohne Teilaufgaben)
+%   \begin{stellung} Aufgabenstellung, woertlich \end{stellung}
+%   \begin{loesung} Loesung \end{loesung}
+\documentclass[11pt,a4paper]{article}
+\usepackage[ngerman]{babel}
+\usepackage{fontspec}
+\usepackage[a4paper,margin=2.2cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+\usepackage[hidelinks]{hyperref}
+
+\definecolor{akzent}{HTML}{8E44AD}
+\definecolor{stellung}{HTML}{55555C}
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0pt}
+\fancyfoot[L]{\footnotesize\color{gray} Lösung · TITEL}
+\fancyfoot[R]{\footnotesize\color{gray} Seite \thepage\ von \pageref{LastPage}}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{4pt}
+
+\newcommand{\aufgabe}[2]{\section*{Aufgabe #1\hfill{\normalsize\mdseries\color{gray}#2}}}
+\newcommand{\teil}[1]{\subsection*{#1}}
+\newenvironment{stellung}{\par\begingroup\color{stellung}\small}{\par\endgroup\smallskip}
+\newenvironment{loesung}{\par\textbf{Lösung.}\ }{\par}
+
+\begin{document}
+\noindent{\color{akzent}\rule{\linewidth}{1.2pt}}\\[4pt]
+{\LARGE\bfseries TITEL}\hfill{\large\color{akzent}\bfseries Lösung}\\[3pt]
+{\large KURS}\hfill{\footnotesize\color{gray} STAND}\\[-2pt]
+{\color{akzent}\rule{\linewidth}{0.6pt}}
+\vspace{2mm}
+
+% Inhalt hier.
+\end{document}

@@ -121,6 +121,13 @@ a.big:hover { border-color: var(--k); }
 .job .msg { white-space: pre-wrap; color: var(--muted); flex: 1; }
 .empty { color: var(--muted); padding: 40px 0; text-align: center; }
 .who { font-size: 12px; font-weight: 600; margin: 10px 0 4px; }
+.teile { margin: 14px 0 0; }
+.file .prio { display: block; margin-top: 2px; padding: 0 6px; font-size: 11px; border-radius: 999px; color: var(--muted); }
+.file .prio.on { color: #fff; background: var(--k); border-color: var(--k); }
+.prio-up { display: inline-flex; gap: 6px; align-items: center; margin-top: 8px; font-size: 13px; color: var(--muted); cursor: pointer; }
+.korr { margin-top: 10px; padding: 8px 12px; border-left: 3px solid var(--k); background: var(--soft); border-radius: 0 8px 8px 0; font-size: 13px; }
+.korr b { font-size: 12px; color: var(--muted); }
+.korr ul, .korr p { margin: 4px 0; } .korr ul { padding-left: 18px; }
 @media (max-width: 640px) {
   .timeline { padding-left: 18px; } .timeline::before { left: 4px; }
   .month { margin-left: -18px; }
@@ -149,9 +156,11 @@ const ART_PLURAL = { skript: "Vorlesungen", uebung: "Übungen", tutorium: "Tutor
 const ORIGINAL = { skript: "Original Skript", uebung: "Original Übungsblatt", tutorium: "Original Tutoriumsblatt", sonstiges: "Original" };
 const FARBEN = ["#2f5d8a", "#6c5ce7", "#00897b", "#c0392b", "#d68910", "#8e44ad", "#2e7d4f", "#e84393"];
 const JOBS = { aufbereiten: "Lösung aufbereiten", vergleich: "Mit Musterlösung vergleichen",
-               verbessern: "Verbessert neu erstellen", lang: "Lang neu erstellen", personalisieren: "Für mich neu erstellen" };
+               verbessern: "Verbessert neu erstellen", lang: "Lang neu erstellen", personalisieren: "Für mich neu erstellen",
+               loesung: "Lösung neu erstellen" };
 const ROLLEN = { original: "Original", musterloesung: "Musterlösung", foto: "Meine Lösung", notiz: "Notiz",
-                 aufbereitet: "Aufbereitet", vergleich: "Vergleich", verbessert: "Verbessert", lang: "Lang", fuer: "Für mich" };
+                 aufbereitet: "Aufbereitet", vergleich: "Vergleich", verbessert: "Verbessert", lang: "Lang", fuer: "Für mich",
+                 loesungsteil: "Lösungsteil", loesung: "Lösung" };
 
 const store = {
   get(k, d) { try { return JSON.parse(localStorage.getItem("wima." + k)) ?? d; } catch { return d; } },
@@ -161,6 +170,7 @@ const S = {
   state: null, items: [], user: null, course: store.get("course", null), login: null,
   filter: store.get("filter", "alle"), open: new Set(store.get("open", [])),
   newCourse: false, newItem: false, editItem: null, editCourse: false, md: {}, more: new Set(),
+  prioUpload: new Set(),  // Einträge, deren nächster Lösungsteil priorisiert hochgeladen wird
 };
 
 const $ = (s) => document.querySelector(s);
@@ -346,7 +356,8 @@ function renderEntry(it) {
     </div>`;
   if (open) {
     const more = S.more.has(it.id);
-    html += `<div class="body">${trio(it)}<div class="more">
+    const blatt = it.art === "uebung" || it.art === "tutorium";
+    html += `<div class="body">${trio(it)}${blatt ? loesungsTeile(it) : ""}<div class="more">
       <button class="ghost" onclick="S.more.${more ? "delete" : "add"}(${it.id});render()">${more ? "Weniger" : "Mehr"}</button>
       <button class="ghost" onclick="S.editItem=${it.id};S.newItem=false;render()">Bearbeiten</button></div>`;
     if (S.editItem === it.id) html += itemForm(it, `saveItem(${it.id})`);
@@ -356,13 +367,13 @@ function renderEntry(it) {
   return html + `</div></div>`;
 }
 
-function fileTile(f, { del = true, label = null } = {}) {
+function fileTile(f, { del = true, label = null, extra = "" } = {}) {
   const ext = (f.name.split(".").pop() || "").toLowerCase();
   const img = (f.mime || "").startsWith("image/");
   const sub = label ?? `${fmtSize(f.groesse)} · ${f.created.slice(8, 10)}.${f.created.slice(5, 7)}.`;
   return `<a class="file" href="/files/${f.id}" target="_blank" title="${esc(f.name)}">
     ${img ? `<img src="/files/${f.id}" loading="lazy">` : `<span class="ic ${ext}">${esc(ext.toUpperCase().slice(0, 4))}</span>`}
-    <span class="nm">${esc(f.name)}<small>${esc(sub)}</small></span>
+    <span class="nm">${esc(f.name)}<small>${esc(sub)}</small>${extra}</span>
     ${del ? `<button class="ghost x" title="Löschen" onclick="event.preventDefault();event.stopPropagation();delFile(${f.id})">×</button>` : ""}
   </a>`;
 }
@@ -407,12 +418,31 @@ function trio(it) {
     : `<div class="big leer ${typ && laeuft(typ) ? "laeuft" : ""}"><span class="ic"></span>${label}</div>`;
   const orig = neueste(shared(it, "original"));
   const lang = it.art === "skript";
-  return `<div class="trio" style="--n:${lang ? 4 : 3}">
+  const loesung = it.art === "uebung" || it.art === "tutorium";
+  return `<div class="trio" style="--n:${lang || loesung ? 4 : 3}">
     ${orig ? kachel("Original", orig) : `<div class="big leer drop" data-item="${it.id}" data-rolle="original" data-owner=""><span class="ic"></span>Original</div>`}
     ${kachel("Verbessert", neueste(shared(it, "verbessert")), "verbessern")}
     ${lang ? kachel("Lang", neueste(shared(it, "lang")), "lang") : ""}
     ${kachel(`Für ${esc(S.user)}`, neueste(mine(it, "fuer")), "personalisieren")}
+    ${loesung ? kachel("Lösung", neueste(shared(it, "loesung")), "loesung") : ""}
   </div>`;
+}
+// Lösungen und Notizen (für alle), aus denen Claude die eine saubere „Lösung“ baut
+function loesungsTeile(it) {
+  const fertig = shared(it, "loesung");
+  const letzter = Math.max(0, ...fertig.map((f) => f.job_id || 0));
+  const korr = fertig.find((f) => (f.job_id || 0) === letzter && f.name.endsWith(".md"));
+  if (korr) loadMd(korr.id);
+  const prioTile = (f) => fileTile(f, { extra: `<button class="prio ${f.prio ? "on" : ""}"
+    title="Bei mehreren Versionen einer Aufgabe diese nehmen, z. B. die Lösung des Tutors"
+    onclick="event.preventDefault();event.stopPropagation();setPrio(${f.id},${f.prio ? 0 : 1})">${f.prio ? "★ priorisiert" : "☆ priorisieren"}</button>` });
+  return `<div class="sec teile"><h4>Lösungen &amp; Notizen</h4><div class="files">
+    ${shared(it, "loesungsteil").map(prioTile).join("")}
+    <div class="drop" data-item="${it.id}" data-rolle="loesungsteil" data-owner="">+ Lösung oder Notiz hochladen, auch Teile</div>
+  </div>
+  <label class="prio-up"><input type="checkbox" ${S.prioUpload.has(it.id) ? "checked" : ""}
+    onchange="S.prioUpload[this.checked ? 'add' : 'delete'](${it.id})"> nächsten Upload priorisieren</label>
+  ${korr ? `<div class="korr"><b>Geändert gegenüber den Uploads</b>${S.md[korr.id] || ""}</div>` : ""}</div>`;
 }
 function details(it) {
   let h = fileSection(it, "original", null, ORIGINAL[it.art], "+ Original hochladen");
@@ -421,9 +451,10 @@ function details(it) {
     h += fileSection(it, "foto", S.user, "Deine Lösung", "+ Fotos / Scans hochladen");
     h += docSection(mine(it, "aufbereitet"), "Aufbereitete Lösung (PDF)");
     h += docSection(mine(it, "vergleich"), "Vergleich mit der Musterlösung");
+    h += docSection(shared(it, "loesung").filter((f) => !f.name.endsWith(".md")), "Lösung (PDF + LaTeX)");
   }
   h += fileSection(it, "notiz", S.user, "Deine Notizen", "+ Notizen (Fotos, PDF, .md) hochladen");
-  const typen = (it.art === "uebung" || it.art === "tutorium") ? ["aufbereiten", "vergleich"] : [];
+  const typen = (it.art === "uebung" || it.art === "tutorium") ? ["aufbereiten", "vergleich", "loesung"] : [];
   return h + actionBar(it, [...typen, "verbessern", ...(it.art === "skript" ? ["lang"] : []), "personalisieren"]);
 }
 function renderJobs(it) {
@@ -462,6 +493,7 @@ async function delItem(id) {
   if (!confirm("Eintrag mit allen Dateien löschen?")) return;
   await api("DELETE", `/api/items/${id}`); await refresh();
 }
+async function setPrio(id, prio) { await api("PATCH", `/api/files/${id}`, { prio }); await refresh(); }
 async function delFile(id) { if (confirm("Datei löschen?")) { await api("DELETE", `/api/files/${id}`); await refresh(); } }
 async function startJob(itemId, typ) {
   const hinweis = $(`#hint_${itemId}`)?.value.trim() || null;
@@ -482,13 +514,21 @@ async function verkleinern(f) {
   return new File([blob], f.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" });
 }
 async function upload(files, { item, rolle, owner }) {
+  // Lösungsteile: Claude erst nach der letzten Datei starten, sonst sieht es nur die erste
+  const teil = rolle === "loesungsteil";
+  const prio = teil && S.prioUpload.delete(+item);
+  let ok = 0;
   for (const original of files) {
     const f = await verkleinern(original);
     const qs = new URLSearchParams({ item, rolle, owner, name: f.name });
+    if (teil) qs.set("spaeter", "1");
+    if (prio) qs.set("prio", "1");
     const r = await fetch(`/api/upload?${qs}`, { method: "POST", body: f });
     if (r.status === 401) return showLogin();
     if (!r.ok) alert(`Upload von ${f.name} fehlgeschlagen: ${(await r.json()).error}`);
+    else ok++;
   }
+  if (teil && ok) await api("POST", "/api/jobs", { item_id: +item, typ: "loesung" });
   await refresh();
 }
 let dropTarget = null;

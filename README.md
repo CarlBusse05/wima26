@@ -28,6 +28,7 @@ Voraussetzungen: Python 3.9+, `claude` (Claude Code, eingeloggt), `uv` und `tect
 | `tools/vorlage_verbessert.tex` | LaTeX-Vorlage für „Verbessert“ und „Für …“ mit Ergänzungskästen |
 | `tools/handschrift.py` | Kariertes Papier zu weißem Hintergrund, Durchgestrichenes entfernen, zuschneiden |
 | `tools/vorlage_loesung.tex` | LaTeX-Kopf für die aufbereitete Abgabe |
+| `tools/vorlage_ausarbeitung.tex` | LaTeX-Vorlage für die getippte „Lösung“ |
 
 ## Drei Ebenen pro Eintrag
 
@@ -45,6 +46,7 @@ Wie „Verbessert“ und „Für …“ entstehen sollen: `docs/plan-optimierung
 | `personalisieren` | Verbessert + eigene Notizen/Vergleiche + Fehlerprofil | „Für <Name>“ (PDF + .tex); startet nach `verbessern` und `vergleich` |
 | `aufbereiten` | Fotos + Blatt | PDF: LaTeX-Kopf + bereinigte Handschrift |
 | `vergleich` | eigene Lösung + Musterlösung + Blatt | `vergleich.md` pro Aufgabe, Fehlerprofil wird ergänzt |
+| `loesung` | alle hochgeladenen Lösungen/Notizen (für alle) + Blatt | „Lösung“: eine saubere LaTeX-Lösung (PDF + .tex), Aufgabenstellung vor jeder Lösung, Fehler still korrigiert; `korrekturen.md` erscheint in der App. Startet nach jedem Upload, Löschen oder Prio-Umschalten |
 
 `verbessern` erledigt der Worker von `WIMA_HAUPT` (Standard: Carl). Die Wissensbasis in
 `wissen/` wird mit jedem Lauf fortgeschrieben, siehe `wissen/README.md`.
