@@ -39,10 +39,14 @@ Cookie "wima" oder "Authorization: Bearer <token>"; lokal zusaetzlich — nur vo
   GET    /api/wissen                     -> {dateien:{pfad: text}}  (fremde Fehlerprofile ausgenommen)
   PUT    /api/wissen?pfad=               Body = Text; nur pruefkatalog.md, kurse/**, personen/<ich>.md
 
-Automatik: Neues Original -> Job "verbessern" (Worker von WIMA_HAUPT, Standard: erster Nutzer);
+Automatik: Neues Original -> Job "verbessern";
 neuer/geloeschter/umgeschalteter Loesungsteil -> Job "loesung" (spaeter=1: noch kein Job, weitere
 Dateien folgen);
 "verbessern"/"lang" fertig -> "personalisieren" fuer alle; "vergleich" fertig -> "personalisieren".
+Gemeinsame Jobs (verbessern, lang, loesung) nimmt der Worker dessen, der sie angestossen hat, zuerst;
+laeuft der nicht, uebernimmt sie jeder andere Worker. Persoenliche Jobs bleiben beim Besitzer.
+Vorausplanung: Beim Laden eines Kurses legt vorplanen() die naechsten Uebungsblaetter und Tutorien
+laut stundenplan.json schon an (Quelle: Kalender auf carlbusse.de).
 """
 
 import argparse
@@ -54,7 +58,7 @@ import os
 import re
 import secrets
 import threading
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from http.cookies import SimpleCookie
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from socketserver import ThreadingMixIn
@@ -66,6 +70,7 @@ from store import db, rows, one
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 PUBLIC = os.path.join(DIR, "public")
+PLAN = os.path.join(DIR, "stundenplan.json")  # Vorausplanung, siehe vorplanen()
 ONLINE = bool(os.environ.get("VERCEL"))
 
 USERS = [u.strip() for u in os.environ.get("WIMA_USERS", "Carl,Emil").split(",") if u.strip()]
@@ -153,11 +158,55 @@ def state(user):
     return {"users": USERS, "arten": ARTEN, "courses": courses, "worker": worker, "now": now()}
 
 
+def plan_termine(reihe, plan, bis):
+    """(nummer, datum) aller Blaetter einer Reihe bis einschliesslich `bis`; Ferienwochen ohne Blatt."""
+    ferien = [(date.fromisoformat(a), date.fromisoformat(b)) for a, b in plan.get("ferien", [])]
+    d, nr = date.fromisoformat(reihe["erstes_datum"]), reihe["erste_nr"]
+    ende = min(bis, date.fromisoformat(plan["ende"]))
+    while d <= ende:
+        if not any(a <= d <= b for a, b in ferien):
+            yield nr, d
+            nr += 1
+        d += timedelta(days=7)
+
+
+def plan_titel(vorlage, d):
+    return re.sub(r"\{\+(\d+)\}", lambda m: (d + timedelta(days=int(m.group(1)))).strftime("%d.%m."), vorlage)
+
+
+_GEPLANT = set()  # (kurs_id, tag): pro Prozess und Tag nur einmal pruefen
+
+
+def vorplanen(con, course):
+    """Legt die naechsten Uebungsblaetter und Tutorien laut stundenplan.json schon vorab an."""
+    heute = datetime.now(ZONE).date()
+    if (course["id"], heute) in _GEPLANT or not os.path.exists(PLAN):
+        return
+    with open(PLAN, encoding="utf-8") as fh:
+        plan = json.load(fh)
+    bis = heute + timedelta(days=plan.get("vorlauf_tage", 7))
+    reihen = [r for r in plan["reihen"] if r["kurs"] == course["kuerzel"]]
+    if reihen:
+        da = {(i["art"], str(i["nummer"])): i for i in
+              rows(con.execute("SELECT * FROM items WHERE course_id=?", (course["id"],)))}
+        for r in reihen:
+            for nr, d in plan_termine(r, plan, bis):
+                titel = plan_titel(r["titel"], d)
+                alt = da.get((r["art"], str(nr)))
+                if not alt:
+                    insert(con, "INSERT INTO items(course_id,art,nummer,titel,datum,created) VALUES(?,?,?,?,?,?)",
+                           (course["id"], r["art"], str(nr), titel, d.isoformat(), now()))
+                elif not alt["titel"]:
+                    con.execute("UPDATE items SET titel=? WHERE id=?", (titel, alt["id"]))
+    _GEPLANT.add((course["id"], heute))
+
+
 def course_items(course_id, user):
     with db() as con:
-        c = one(con.execute("SELECT owner FROM courses WHERE id=?", (course_id,)))
+        c = one(con.execute("SELECT * FROM courses WHERE id=?", (course_id,)))
         if not c or (c["owner"] and c["owner"] != user):
             raise ApiError(404, "Kurs nicht gefunden")
+        vorplanen(con, c)
         items = rows(con.execute(
             "SELECT * FROM items WHERE course_id=? ORDER BY datum DESC, id DESC", (course_id,)))
         ids = [i["id"] for i in items] or [-1]
@@ -272,9 +321,14 @@ def delete_file(fid):
 
 
 def queue_job(con, item_id, typ, owner, hinweis=None):
-    """Legt einen Job an, ausser es wartet schon derselbe (dann zaehlt der)."""
-    row = one(con.execute("SELECT id FROM jobs WHERE item_id=? AND typ=? AND owner=? AND status='offen'",
-                          (item_id, typ, owner)))
+    """Legt einen Job an, ausser es wartet schon derselbe (dann zaehlt der).
+    Gemeinsame Jobs gibt es pro Eintrag nur einmal, egal wer sie angestossen hat."""
+    if JOB_TYPEN[typ][1]:
+        row = one(con.execute("SELECT id FROM jobs WHERE item_id=? AND typ=? AND owner=? AND status='offen'",
+                              (item_id, typ, owner)))
+    else:
+        row = one(con.execute("SELECT id FROM jobs WHERE item_id=? AND typ=? AND status='offen'",
+                              (item_id, typ)))
     if row:
         return row["id"]
     return insert(con, "INSERT INTO jobs(item_id,typ,owner,hinweis,created) VALUES(?,?,?,?,?)",
@@ -284,9 +338,10 @@ def queue_job(con, item_id, typ, owner, hinweis=None):
 def create_job(body, user):
     if body.get("typ") not in JOB_TYPEN:
         raise ApiError(400, f"typ muss eins von {list(JOB_TYPEN)} sein")
-    owner = HAUPT if not JOB_TYPEN[body["typ"]][1] else user  # gemeinsame Jobs macht HAUPT
+    # Wer den Job anstoesst, dessen Worker nimmt ihn zuerst; gemeinsame Jobs darf aber
+    # jeder laufende Worker uebernehmen (siehe claim), damit nichts auf einen Rechner wartet.
     with db() as con:
-        jid = queue_job(con, body["item_id"], body["typ"], owner, body.get("hinweis"))
+        jid = queue_job(con, body["item_id"], body["typ"], user, body.get("hinweis"))
         return one(con.execute("SELECT * FROM jobs WHERE id=?", (jid,)))
 
 
@@ -400,9 +455,12 @@ def claim(user):
     with LOCK, db() as con:
         con.execute("INSERT INTO worker(nutzer,last_seen) VALUES(?,?) "
                     "ON CONFLICT(nutzer) DO UPDATE SET last_seen=excluded.last_seen", (user, now()))
+        gemeinsam = ",".join(f"'{t}'" for t, (_, privat) in JOB_TYPEN.items() if not privat)
         job = one(con.execute(
-            "UPDATE jobs SET status='laeuft', started=? WHERE id=(SELECT id FROM jobs "
-            f"WHERE status='offen' AND owner=? ORDER BY id LIMIT 1{sperre}) RETURNING *", (now(), user)))
+            "UPDATE jobs SET status='laeuft', started=?, owner=? WHERE id=(SELECT id FROM jobs "
+            f"WHERE status='offen' AND (owner=? OR typ IN ({gemeinsam})) "
+            f"ORDER BY CASE WHEN owner=? THEN 0 ELSE 1 END, id LIMIT 1{sperre}) RETURNING *",
+            (now(), user, user, user)))
         if not job:
             return None
         item = one(con.execute("SELECT * FROM items WHERE id=?", (job["item_id"],)))

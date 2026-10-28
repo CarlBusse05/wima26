@@ -1,0 +1,12 @@
+{
+  "_info": "Wiederkehrende Eintraege, die Wima selbst anlegt, sobald ihr Datum hoechstens 'vorlauf_tage' entfernt ist. Quelle: Kalender auf carlbusse.de (Stand 28.10.2026) und die bisherigen Blaetter. {+N} im Titel = Datum des Eintrags plus N Tage. Ferien: in diesen Wochen erscheint kein Blatt, die Nummern laufen danach weiter.",
+  "vorlauf_tage": 7,
+  "ende": "2027-02-12",
+  "ferien": [["2026-12-21", "2027-01-03"]],
+  "reihen": [
+    {"kurs": "Ana",  "art": "uebung",   "erste_nr": 1, "erstes_datum": "2026-10-14", "titel": "Abgabe bis Mi {+7}, 15:00"},
+    {"kurs": "Ana",  "art": "tutorium", "erste_nr": 1, "erstes_datum": "2026-10-14", "titel": "Tutorium Mi {+7}, 12:15"},
+    {"kurs": "LinA", "art": "uebung",   "erste_nr": 1, "erstes_datum": "2026-10-16", "titel": "Abgabe bis Fr {+7}, 20:00"},
+    {"kurs": "LinA", "art": "tutorium", "erste_nr": 1, "erstes_datum": "2026-10-16", "titel": "Tutorium Do {+6}, 14:15"}
+  ]
+}

@@ -48,9 +48,32 @@ Wie „Verbessert“ und „Für …“ entstehen sollen: `docs/plan-optimierung
 | `vergleich` | eigene Lösung + Musterlösung + Blatt | `vergleich.md` pro Aufgabe, Fehlerprofil wird ergänzt |
 | `loesung` | alle hochgeladenen Lösungen/Notizen (für alle) + Blatt | „Lösung“: eine saubere LaTeX-Lösung (PDF + .tex), Aufgabenstellung vor jeder Lösung, Fehler still korrigiert; `korrekturen.md` erscheint in der App. Startet nach jedem Upload, Löschen oder Prio-Umschalten |
 
-`verbessern` erledigt der Worker von `WIMA_HAUPT` (Standard: Carl). Die Wissensbasis in
+Gemeinsame Jobs (`verbessern`, `lang`, `loesung`) nimmt zuerst der Worker dessen, der sie
+angestoßen hat; läuft der gerade nicht, erledigt sie jeder andere laufende Worker. Persönliche
+Jobs (`personalisieren`, `aufbereiten`, `vergleich`) bleiben beim jeweiligen Nutzer. Die Wissensbasis in
 `wissen/` wird mit jedem Lauf fortgeschrieben, siehe `wissen/README.md`.
 
 Die Anmeldung trennt Carl und Emil, ist aber kein Schutz für offene Netze. Nur lokal
 oder im vertrauenswürdigen WLAN betreiben.
 Später: Moodle-Sync als weiterer Job-Typ, Umstieg auf die API, indem nur `worker.py` ersetzt wird.
+
+## Emil verbinden
+
+Emil arbeitet auf wima26.de mit seinem eigenen Login (`emil`) und kann dort alles hochladen.
+Damit auch **sein** Claude Aufträge erledigt (z. B. „Lang“, seine „Für Emil“-Version, Lösungen),
+startet er auf seinem Mac einmalig den Worker:
+
+1. Carl lädt Emil auf GitHub in das private Repo `CarlBusse05/wima26` ein.
+2. Emil installiert Claude Code (und meldet sich an), außerdem `brew install uv tectonic`.
+3. `git clone https://github.com/CarlBusse05/wima26.git && cd wima26 && ./start.sh Emil`
+   Beim ersten Start fragt der Worker nach Emils Wima-Passwort und merkt sich danach den Login.
+
+Solange das Terminalfenster offen ist, holt sich Emils Worker seine eigenen Aufträge und alle
+gemeinsamen, die gerade niemand anders erledigt. Aktualisieren: `git pull`, dann neu starten.
+
+## Vorausplanung
+
+`stundenplan.json` beschreibt, wann welche Blätter erscheinen (Quelle: Kalender auf carlbusse.de).
+Beim Öffnen eines Kurses legt der Server die Übungsblätter und Tutorien der nächsten 7 Tage
+schon an, mit Abgabe- bzw. Tutoriumstermin im Titel. Ferienwochen und das Semesterende stehen
+ebenfalls dort. Jeder Eintrag hat oben rechts „Hochladen“, der Kurs einen eigenen „Hochladen“-Knopf.

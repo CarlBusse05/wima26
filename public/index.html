@@ -124,6 +124,12 @@ a.big:hover { border-color: var(--k); }
 .teile { margin: 14px 0 0; }
 .file .prio { display: block; margin-top: 2px; padding: 0 6px; font-size: 11px; border-radius: 999px; color: var(--muted); }
 .file .prio.on { color: #fff; background: var(--k); border-color: var(--k); }
+.upmenu { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 0 14px 12px; }
+.upmenu b { font-size: 13px; color: var(--muted); font-weight: 600; margin-right: 4px; }
+.upmenu button { font-size: 13px; padding: 5px 10px; }
+.upbtn { margin-left: auto; font-size: 13px; padding: 4px 10px; }
+.upkurs { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.upkurs select { max-width: 100%; }
 .prio-up { display: inline-flex; gap: 6px; align-items: center; margin-top: 8px; font-size: 13px; color: var(--muted); cursor: pointer; }
 .korr { margin-top: 10px; padding: 8px 12px; border-left: 3px solid var(--k); background: var(--soft); border-radius: 0 8px 8px 0; font-size: 13px; }
 .korr b { font-size: 12px; color: var(--muted); }
@@ -153,6 +159,7 @@ a.big:hover { border-color: var(--k); }
 <script>
 const ARTEN = { skript: "Vorlesung", uebung: "Übungsblatt", tutorium: "Tutorium", sonstiges: "Sonstiges" };
 const ART_PLURAL = { skript: "Vorlesungen", uebung: "Übungen", tutorium: "Tutorien", sonstiges: "Sonstiges" };
+const GEMEINSAM = new Set(["verbessern", "lang", "loesung"]);  // darf jeder Worker erledigen
 const ORIGINAL = { skript: "Original Skript", uebung: "Original Übungsblatt", tutorium: "Original Tutoriumsblatt", sonstiges: "Original" };
 const FARBEN = ["#2f5d8a", "#6c5ce7", "#00897b", "#c0392b", "#d68910", "#8e44ad", "#2e7d4f", "#e84393"];
 const JOBS = { aufbereiten: "Lösung aufbereiten", vergleich: "Mit Musterlösung vergleichen",
@@ -171,6 +178,8 @@ const S = {
   filter: store.get("filter", "alle"), open: new Set(store.get("open", [])),
   newCourse: false, newItem: false, editItem: null, editCourse: false, md: {}, more: new Set(),
   prioUpload: new Set(),  // Einträge, deren nächster Lösungsteil priorisiert hochgeladen wird
+  upMenu: null,           // Eintrag, dessen Upload-Menü offen ist
+  upKurs: false, upKursItem: null,  // „Hochladen“ für den ganzen Kurs
 };
 
 const $ = (s) => document.querySelector(s);
@@ -297,7 +306,9 @@ function renderCourse() {
   html += `<div class="chead"><h2>${esc(c.name)}</h2>
     <button class="ghost" onclick="S.editCourse=true;render()">Bearbeiten</button>
     <button class="ghost" onclick="deleteCourse(${c.id})">Löschen</button>
+    <button class="primary" onclick="S.upKurs=!S.upKurs;render()">Hochladen</button>
     <button class="primary" onclick="S.newItem=!S.newItem;S.editItem=null;render()">+ Eintrag</button></div>`;
+  if (S.upKurs) html += upKursPanel();
   if (S.newItem) html += itemForm({}, "createItem()");
   html += `<div class="chips">
     <button class="chip ${S.filter === "alle" ? "on" : ""}" onclick="S.filter='alle';render()">Alle · ${S.items.length}</button>
@@ -353,7 +364,10 @@ function renderEntry(it) {
       <span class="kind">${ARTEN[it.art]}</span>
       <span class="t">${title}${it.titel ? ` <small>· ${esc(it.titel)}</small>` : ""}</span>
       <span class="sum">${summary(it)}</span>
+      <button class="upbtn" onclick="event.stopPropagation();S.upMenu=S.upMenu===${it.id}?null:${it.id};render()">Hochladen</button>
     </div>`;
+  if (S.upMenu === it.id) html += `<div class="upmenu"><b>Was lädst du hoch?</b>${upZiele(it).map(([k, label]) =>
+    `<button onclick="waehleUpload(${it.id},'${k}')">${label}</button>`).join("")}</div>`;
   if (open) {
     const more = S.more.has(it.id);
     const blatt = it.art === "uebung" || it.art === "tutorium";
@@ -427,6 +441,39 @@ function trio(it) {
     ${loesung ? kachel("Lösung", neueste(shared(it, "loesung")), "loesung") : ""}
   </div>`;
 }
+// Upload-Ziele je Art: [Schlüssel, Beschriftung]; der Schlüssel bestimmt Rolle, Besitzer und Prio
+const ZIELE = {
+  tafel:   { rolle: "loesungsteil", prio: true },  loesung: { rolle: "loesungsteil" },
+  blatt:   { rolle: "original" },                   muster:  { rolle: "musterloesung" },
+  eigene:  { rolle: "foto", privat: true },         notiz:   { rolle: "notiz", privat: true },
+};
+function upZiele(it) {
+  if (it.art === "uebung" || it.art === "tutorium")
+    return [["tafel", "Tafel / Tutor (priorisiert)"], ["loesung", "Lösung oder Notiz (für alle)"],
+            ["blatt", "Aufgabenblatt"], ["muster", "Musterlösung"], ["eigene", "Eigene Lösung"], ["notiz", "Eigene Notizen"]];
+  return [["blatt", it.art === "skript" ? "Skript (neue Version)" : "Datei (für alle)"], ["notiz", "Eigene Notizen / Mitschrift"]];
+}
+function waehleUpload(itemId, ziel) {
+  const z = ZIELE[ziel];
+  if (z.prio) S.prioUpload.add(itemId); else S.prioUpload.delete(itemId);
+  dropTarget = { item: String(itemId), rolle: z.rolle, owner: z.privat ? S.user : "" };
+  S.upMenu = null; S.upKurs = false;
+  $("#picker").click();
+}
+function upKursPanel() {
+  // Vorauswahl: der Eintrag, dessen Datum heute am nächsten liegt (bevorzugt der jüngste vergangene)
+  const heute = new Date().toISOString().slice(0, 10);
+  const sortiert = [...S.items].sort((a, b) => (b.datum || "").localeCompare(a.datum || ""));
+  const id = S.upKursItem ?? (sortiert.find((i) => (i.datum || "") <= heute) || sortiert[0])?.id;
+  const it = S.items.find((i) => i.id === id);
+  if (!it) return `<div class="panel upkurs">Lege zuerst einen Eintrag an.</div>`;
+  return `<div class="panel upkurs">
+    <select id="up_item" onchange="S.upKursItem=+this.value;render()">${sortiert.map((i) =>
+      `<option value="${i.id}" ${i.id === it.id ? "selected" : ""}>${fmtDate(i.datum)} · ${ARTEN[i.art]}${i.nummer ? " " + esc(i.nummer) : ""}${i.titel ? " · " + esc(i.titel) : ""}</option>`).join("")}</select>
+    ${upZiele(it).map(([k, label]) => `<button onclick="waehleUpload(${it.id},'${k}')">${label}</button>`).join("")}
+    <button class="ghost" onclick="S.upKurs=false;render()">Abbrechen</button></div>`;
+}
+
 // Lösungen und Notizen (für alle), aus denen Claude die eine saubere „Lösung“ baut
 function loesungsTeile(it) {
   const fertig = shared(it, "loesung");
@@ -463,7 +510,7 @@ function renderJobs(it) {
   return `<div class="sec jobs"><h4>Claude-Aufträge</h4>${it.jobs.slice(0, 6).map((j) => `<div class="job">
     <span>${icon[j.status]}</span>
     <div style="flex:1"><b>${JOBS[j.typ]}</b> · ${esc(j.owner)} · ${esc((j.created || "").slice(5, 16).replace("T", " "))}
-      ${j.status === "offen" ? `<div class="msg">Wartet auf ${esc(j.owner)}s Worker …</div>` : ""}
+      ${j.status === "offen" ? `<div class="msg">${GEMEINSAM.has(j.typ) ? "Wartet auf einen laufenden Worker (Carl oder Emil) …" : `Wartet auf ${esc(j.owner)}s Worker …`}</div>` : ""}
       ${j.status === "laeuft" ? `<div class="msg">Claude arbeitet seit ${esc((j.started || "").slice(11, 16))} …</div>` : ""}
       ${j.ergebnis ? `<div class="msg">${esc(j.ergebnis)}</div>` : ""}</div>
     ${j.status === "fehler" || j.status === "laeuft" ? `<button class="ghost" onclick="retryJob(${j.id})">Neu starten</button>` : ""}
