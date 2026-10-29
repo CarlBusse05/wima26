@@ -57,6 +57,9 @@ main { max-width: 1040px; margin: 0 auto; padding: 16px 16px 80px; }
 
 .chead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
 .chead h2 { margin: 0; font-size: 22px; letter-spacing: -.02em; margin-right: auto; }
+.skript { margin-bottom: 22px; }
+.skript .card { border-left: 5px solid var(--k); }
+.skript .top { cursor: default; }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
 .chip { border-radius: 999px; padding: 3px 12px; font-size: 13px; }
 .chip.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
@@ -300,8 +303,12 @@ function readCourseForm() {
 function renderCourse() {
   const c = S.state.courses.find((c) => c.id === S.course);
   if (!c) return `<div class="empty">Leg oben deinen ersten Kurs an.</div>`;
-  const counts = Object.fromEntries(Object.keys(ARTEN).map((a) => [a, S.items.filter((i) => i.art === a).length]));
-  const list = S.items.filter((i) => S.filter === "alle" || i.art === S.filter);
+  // Pro Kurs gibt es ein Skript (der neueste Skript-Eintrag); die Timeline zeigt nur Blätter und Termine
+  const skript = S.items.find((i) => i.art === "skript");
+  if (S.filter === "skript") S.filter = "alle";
+  const termine = S.items.filter((i) => i.art !== "skript");
+  const counts = Object.fromEntries(Object.keys(ARTEN).map((a) => [a, termine.filter((i) => i.art === a).length]));
+  const list = termine.filter((i) => S.filter === "alle" || i.art === S.filter);
   let html = S.editCourse ? courseForm(c, `saveCourse(${c.id})`) : "";
   html += `<div class="chead"><h2>${esc(c.name)}</h2>
     <button class="ghost" onclick="S.editCourse=true;render()">Bearbeiten</button>
@@ -310,8 +317,10 @@ function renderCourse() {
     <button class="primary" onclick="S.newItem=!S.newItem;S.editItem=null;render()">+ Eintrag</button></div>`;
   if (S.upKurs) html += upKursPanel();
   if (S.newItem) html += itemForm({}, "createItem()");
+  html += skript ? renderSkript(skript)
+    : `<div class="skript"><button class="drop" style="width:100%" onclick="neuesSkript()">+ Skript hochladen</button></div>`;
   html += `<div class="chips">
-    <button class="chip ${S.filter === "alle" ? "on" : ""}" onclick="S.filter='alle';render()">Alle · ${S.items.length}</button>
+    <button class="chip ${S.filter === "alle" ? "on" : ""}" onclick="S.filter='alle';render()">Alle · ${termine.length}</button>
     ${Object.entries(ART_PLURAL).filter(([a]) => counts[a]).map(([a, n]) =>
       `<button class="chip ${S.filter === a ? "on" : ""}" onclick="S.filter='${a}';render()">${n} · ${counts[a]}</button>`).join("")}
   </div>`;
@@ -328,10 +337,10 @@ function renderCourse() {
 }
 
 function itemForm(it, onsave) {
-  const art = it.art || (S.filter !== "alle" ? S.filter : "uebung");
+  const art = it.art || (S.filter !== "alle" && S.filter !== "skript" ? S.filter : "uebung");
   const nextNr = Math.max(0, ...S.items.filter((i) => i.art === art).map((i) => parseInt(i.nummer) || 0)) + 1;
   return `<div class="panel form">
-    <select id="if_art">${Object.entries(ARTEN).map(([a, n]) => `<option value="${a}" ${a === art ? "selected" : ""}>${n}</option>`).join("")}</select>
+    <select id="if_art">${Object.entries(ARTEN).filter(([a]) => a !== "skript" || it.art === "skript").map(([a, n]) => `<option value="${a}" ${a === art ? "selected" : ""}>${n}</option>`).join("")}</select>
     <input type="text" id="if_nummer" placeholder="Nr." style="flex:0 1 70px" value="${esc(it.nummer ?? (it.id ? "" : nextNr))}">
     <input type="text" id="if_titel" placeholder="Titel, z. B. Kapitel 3: Differentialrechnung" value="${esc(it.titel)}">
     <input type="date" id="if_datum" value="${esc(it.datum || new Date().toISOString().slice(0, 10))}">
@@ -356,13 +365,21 @@ function summary(it) {
 }
 
 function renderEntry(it) {
-  const k = `var(--${it.art})`;
-  const open = S.open.has(it.id);
-  const title = `${ARTEN[it.art]}${it.nummer ? " " + esc(it.nummer) : ""}`;
-  let html = `<div class="entry" style="--k:${k}"><div class="date">${fmtDate(it.datum)}</div><div class="card">
-    <div class="top" onclick="toggle(${it.id})">
-      <span class="kind">${ARTEN[it.art]}</span>
-      <span class="t">${title}${it.titel ? ` <small>· ${esc(it.titel)}</small>` : ""}</span>
+  return `<div class="entry" style="--k:var(--${it.art})"><div class="date">${fmtDate(it.datum)}</div>${card(it)}</div>`;
+}
+// Das Skript steht über der Timeline: immer aufgeklappt, eine Fassung für den ganzen bisherigen Stoff
+function renderSkript(it) {
+  const orig = neueste(shared(it, "original"));
+  const stand = orig ? `Stand ${orig.created.slice(8, 10)}.${orig.created.slice(5, 7)}.` : "noch kein PDF";
+  return `<div class="skript" style="--k:var(--skript)">${card(it, { fest: true, titel: `Skript <small>· ${stand}</small>` })}</div>`;
+}
+function card(it, { fest = false, titel = null } = {}) {
+  const open = fest || S.open.has(it.id);
+  const title = titel ?? `${ARTEN[it.art]}${it.nummer ? " " + esc(it.nummer) : ""}${it.titel ? ` <small>· ${esc(it.titel)}</small>` : ""}`;
+  let html = `<div class="card">
+    <div class="top" ${fest ? "" : `onclick="toggle(${it.id})"`}>
+      <span class="kind">${fest ? "Skript" : ARTEN[it.art]}</span>
+      <span class="t">${title}</span>
       <span class="sum">${summary(it)}</span>
       <button class="upbtn" onclick="event.stopPropagation();S.upMenu=S.upMenu===${it.id}?null:${it.id};render()">Hochladen</button>
     </div>`;
@@ -378,7 +395,7 @@ function renderEntry(it) {
     if (more) html += `<div class="details">${details(it)}${renderJobs(it)}</div>`;
     html += `</div>`;
   }
-  return html + `</div></div>`;
+  return html + `</div>`;
 }
 
 function fileTile(f, { del = true, label = null, extra = "" } = {}) {
@@ -534,6 +551,12 @@ async function deleteCourse(id) {
 async function createItem() {
   const it = await api("POST", "/api/items", { ...readItemForm(), course_id: S.course });
   S.newItem = false; S.open.add(it.id); await refresh();
+}
+async function neuesSkript() {
+  const it = await api("POST", "/api/items", { course_id: S.course, art: "skript", nummer: "1", titel: "Skript",
+                                              datum: new Date().toISOString().slice(0, 10) });
+  await refresh();
+  waehleUpload(it.id, "blatt");
 }
 async function saveItem(id) { await api("PATCH", `/api/items/${id}`, readItemForm()); S.editItem = null; await refresh(); }
 async function delItem(id) {
