@@ -456,10 +456,15 @@ def claim(user):
         con.execute("INSERT INTO worker(nutzer,last_seen) VALUES(?,?) "
                     "ON CONFLICT(nutzer) DO UPDATE SET last_seen=excluded.last_seen", (user, now()))
         gemeinsam = ",".join(f"'{t}'" for t, (_, privat) in JOB_TYPEN.items() if not privat)
+        # Mit mehreren Workern parallel: "lang" wartet auf "verbessern" desselben Eintrags,
+        # "personalisieren" auf beide, sonst arbeiten sie mit einer veralteten Grundlage
         job = one(con.execute(
-            "UPDATE jobs SET status='laeuft', started=?, owner=? WHERE id=(SELECT id FROM jobs "
-            f"WHERE status='offen' AND (owner=? OR typ IN ({gemeinsam})) "
-            f"ORDER BY CASE WHEN owner=? THEN 0 ELSE 1 END, id LIMIT 1{sperre}) RETURNING *",
+            "UPDATE jobs SET status='laeuft', started=?, owner=? WHERE id=(SELECT j.id FROM jobs j "
+            f"WHERE j.status='offen' AND (j.owner=? OR j.typ IN ({gemeinsam})) "
+            "AND NOT EXISTS (SELECT 1 FROM jobs v WHERE v.item_id=j.item_id AND v.status IN ('offen','laeuft') "
+            "AND ((j.typ='lang' AND v.typ='verbessern') "
+            "OR (j.typ='personalisieren' AND v.typ IN ('verbessern','lang')))) "
+            f"ORDER BY CASE WHEN j.owner=? THEN 0 ELSE 1 END, j.id LIMIT 1{sperre}) RETURNING *",
             (now(), user, user, user)))
         if not job:
             return None
