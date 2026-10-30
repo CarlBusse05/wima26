@@ -39,6 +39,10 @@ Eingaben:
    - Ist jede Ergänzung mathematisch korrekt?
    - Ist jede Einheit vollständig nach dem Gerüst?
    - Wird keine Übungsaufgabe vorgelöst?
+   - Ist jeder Beweis für sich lesbar? Jede Variable wird im Beweis selbst eingeführt („Sei $x_0\in L$
+     fest gewählt“), auch wenn sie schon im Satz vorkommt. Bei einer Mengengleichheit stehen beide
+     Inklusionen mit Zwischenüberschrift da. Die Begründung rechts passt genau zum Schritt
+     („Definition von $y$“, nicht „Annahme“).
    - Liest es sich leicht und nicht gequetscht?
 6. Lege genau zwei Dateien in `output/`: `{{DATEINAME}}.pdf` und `{{DATEINAME}}.tex`.
 7. Ergänze `wissen/kurse/{{KUERZEL}}/stoff.md`, wenn dir beim Erklären neue Zusammenhänge
