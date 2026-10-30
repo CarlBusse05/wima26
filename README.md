@@ -43,7 +43,7 @@ Wie „Verbessert“ und „Für …“ entstehen sollen: `docs/plan-optimierung
 | Typ | Eingaben | Ergebnis |
 |---|---|---|
 | `verbessern` | Original + andere Originale des Kurses + `wissen/` | „Verbessert“ (PDF + .tex), für alle; startet automatisch bei neuem Original |
-| `personalisieren` | Verbessert + eigene Notizen/Vergleiche + Fehlerprofil | „Für <Name>“ (PDF + .tex); startet nach `verbessern` und `vergleich` |
+| `personalisieren` | Verbessert + eigene Notizen/Vergleiche + Fehlerprofil | „Für <Name>“ (PDF + .tex); nur per Knopf, nie automatisch |
 | `aufbereiten` | Fotos + Blatt | PDF: LaTeX-Kopf + bereinigte Handschrift |
 | `vergleich` | eigene Lösung + Musterlösung + Blatt | `vergleich.md` pro Aufgabe, Fehlerprofil wird ergänzt |
 | `loesung` | alle hochgeladenen Lösungen/Notizen (für alle) + Blatt | „Lösung“: eine saubere LaTeX-Lösung (PDF + .tex), Aufgabenstellung vor jeder Lösung, Fehler still korrigiert; `korrekturen.md` erscheint in der App. Startet nach jedem Upload, Löschen oder Prio-Umschalten |

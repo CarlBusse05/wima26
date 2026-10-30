@@ -42,7 +42,7 @@ Cookie "wima" oder "Authorization: Bearer <token>"; lokal zusaetzlich — nur vo
 Automatik: Neues Original -> Job "verbessern";
 neuer/geloeschter/umgeschalteter Loesungsteil -> Job "loesung" (spaeter=1: noch kein Job, weitere
 Dateien folgen);
-"verbessern"/"lang" fertig -> "personalisieren" fuer alle; "vergleich" fertig -> "personalisieren".
+"personalisieren" ("Fuer <Name>") startet nie automatisch, nur per Knopf.
 Gemeinsame Jobs (verbessern, lang, loesung) nimmt der Worker dessen, der sie angestossen hat, zuerst;
 laeuft der nicht, uebernimmt sie jeder andere Worker. Persoenliche Jobs bleiben beim Besitzer.
 Vorausplanung: Beim Laden eines Kurses legt vorplanen() die naechsten Uebungsblaetter und Tutorien
@@ -345,17 +345,6 @@ def create_job(body, user):
         return one(con.execute("SELECT * FROM jobs WHERE id=?", (jid,)))
 
 
-def folgejobs(con, job):
-    # "lang" startet (noch) nicht automatisch, erst testen wir es an Stochastik
-    if job["typ"] in ("verbessern", "lang"):
-        owner = one(con.execute("SELECT c.owner FROM courses c JOIN items i ON i.course_id=c.id WHERE i.id=?",
-                                (job["item_id"],)))["owner"]
-        for u in ([owner] if owner else USERS):
-            queue_job(con, job["item_id"], "personalisieren", u)
-    elif job["typ"] == "vergleich":
-        queue_job(con, job["item_id"], "personalisieren", job["owner"])
-
-
 def job_status(job_id, status, ergebnis=None):
     with db() as con:
         if status == "offen":
@@ -365,8 +354,6 @@ def job_status(job_id, status, ergebnis=None):
             con.execute("UPDATE jobs SET status=?, ergebnis=?, finished=? WHERE id=?",
                         (status, ergebnis, now(), job_id))
         row = one(con.execute("SELECT * FROM jobs WHERE id=?", (job_id,)))
-        if row and status == "fertig":
-            folgejobs(con, row)
     if not row:
         raise ApiError(404, "Job nicht gefunden")
     return row
