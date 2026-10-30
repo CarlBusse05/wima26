@@ -52,6 +52,12 @@ beibringen, ohne sich durch ein dichtes PDF zu kämpfen.
 - **Lerneinheiten:** ein Begriff oder ein Satz pro Einheit, jede auf einer neuen Seite,
   meist 1–3 Seiten lang. Immer dasselbe Gerüst:
   1. *Worum geht's?* Die Frage oder das Problem, das der Begriff löst.
+     Danach, noch vor dem Kasten, ein **Klartext-Satz**: was die Objekte konkret *sind*
+     („$S_n$ ist die Menge aller Umordnungen der Zahlen $1,\dots,n$“). Baut eine Definition
+     auf früheren Begriffen auf ($S_n=S(M_n)$), wird sie direkt danach **ausgepackt**: Was
+     bedeutet jedes Symbol, und was kommt heraus, wenn man alles einsetzt? Der Leser soll
+     nie selbst eine Kette aus drei Definitionen zurückverfolgen müssen. Bei kleinen Fällen
+     alle Elemente hinschreiben (z. B. alle 6 Elemente von $S_3$).
   2. Anschauung zuerst: Grafik oder kleines Beispiel, **bevor** die Formel kommt.
   3. Definition bzw. Satz im Kasten, mit Verweis auf die Nummer im Skript.
   4. Durchgerechnetes Beispiel und, wo es hilft, ein Gegenbeispiel (Was passiert ohne
