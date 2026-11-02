@@ -12,6 +12,9 @@
 // danach hochgeladen, fremde Änderungen werden beim Öffnen und regelmäßig geholt. Haben zwei gleichzeitig
 // gespeichert, wird zusammengeführt (Striche und Zettel einzeln, über ihre id, gegen den letzten gemeinsamen Stand).
 // Index, Anpinnen und Abfrage-Statistik bleiben persönlich.
+//
+// Jeder Strich und Zettel trägt seinen Autor ("von"). Wessen Notizen zu sehen sind, wählt man in Wima je Eintrag
+// („Notizen: Carl Emil“); bearbeiten und radieren kann man nur die eigenen.
 
 import { del, get, getAll, put, writeHooks, type Entry, type Script, type ScriptIndex } from "./db";
 import { ingestPdf, INDEX_VERSION, mergeEntries } from "./ingest";
@@ -135,6 +138,43 @@ export async function scriptsBySource(): Promise<Map<string, Script>> {
 
 const stand = async (item: number, rolle: string) =>
   getJson<Stand | Record<string, never>>(`/api/notizen?item=${item}&rolle=${rolle}`).then((s) => ("rev" in s ? (s as Stand) : null));
+
+// ---------- wessen Notizen zu sehen sind ----------
+
+let wer: Promise<{ user: string; users: string[] }> | null = null;
+/** Angemeldeter Wima-Nutzer und alle Nutzer. */
+export const wimaNutzer = () =>
+  (wer ??= getJson<{ user: string; users: string[] }>("/api/state").then((s) => ({ user: s.user, users: s.users })));
+
+// Gleiche Adresse wie Wima, also derselbe localStorage: { <Eintrag>: ["Carl", …] }
+const SICHT = "wima.notizenSicht";
+const sichtAlle = (): Record<string, string[]> => {
+  try {
+    return JSON.parse(localStorage.getItem(SICHT) ?? "{}") ?? {};
+  } catch {
+    return {};
+  }
+};
+export const sichtbar = (item: number): string[] => sichtAlle()[item] ?? [];
+export function setSichtbar(item: number, users: string[]) {
+  try {
+    localStorage.setItem(SICHT, JSON.stringify({ ...sichtAlle(), [item]: users }));
+  } catch {
+    /* privates Fenster o. Ä. */
+  }
+  window.dispatchEvent(new CustomEvent("wima-sicht", { detail: item }));
+}
+/** Meldet Änderungen der Auswahl – auch aus dem Wima-Tab. */
+export function onSicht(item: number, cb: (users: string[]) => void): () => void {
+  const on = () => cb(sichtbar(item));
+  const storage = (e: StorageEvent) => e.key === SICHT && on();
+  window.addEventListener("wima-sicht", on);
+  window.addEventListener("storage", storage);
+  return () => {
+    window.removeEventListener("wima-sicht", on);
+    window.removeEventListener("storage", storage);
+  };
+}
 
 // ---------- lokaler Zustand des Abgleichs ----------
 

@@ -40,13 +40,12 @@ header { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, va
 .login .err { font-size: 13px; color: var(--err); margin: 0; }
 
 main { max-width: 1040px; margin: 0 auto; padding: 16px 16px 80px; }
-.courses { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; margin-bottom: 22px; }
-.course { text-align: left; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line);
-          background: var(--panel); box-shadow: var(--shadow); border-left: 5px solid var(--c); min-height: 64px; }
-.course b { display: block; font-size: 15px; }
-.course small { color: var(--muted); }
-.course.on { outline: 2px solid var(--c); outline-offset: -1px; }
-.course.add { border-style: dashed; border-left-width: 1px; color: var(--muted); box-shadow: none; display: grid; place-items: center; }
+.courses { display: flex; gap: 8px; flex-wrap: wrap; }
+.course { padding: 6px 16px; border-radius: 999px; border: 0; font-weight: 600; color: #fff;
+          background: color-mix(in srgb, var(--c) 55%, var(--bg)); }
+.course:hover { background: color-mix(in srgb, var(--c) 80%, var(--bg)); }
+.course.on { background: var(--c); box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--c); }
+body { background: color-mix(in srgb, var(--kurs, var(--bg)) 7%, var(--bg)); }
 
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; box-shadow: var(--shadow); }
 .form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
@@ -55,8 +54,6 @@ main { max-width: 1040px; margin: 0 auto; padding: 16px 16px 80px; }
 .swatch { width: 22px; height: 22px; border-radius: 50%; border: 2px solid transparent; padding: 0; background: var(--s); }
 .swatch.on { border-color: var(--ink); }
 
-.chead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
-.chead h2 { margin: 0; font-size: 22px; letter-spacing: -.02em; margin-right: auto; }
 .skript { margin-bottom: 22px; }
 .skript .card { border-left: 5px solid var(--k); }
 .skript .top { cursor: default; }
@@ -87,13 +84,11 @@ main { max-width: 1040px; margin: 0 auto; padding: 16px 16px 80px; }
 .big { display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 10px;
        background: var(--bg); color: var(--ink); text-decoration: none; font-weight: 600; min-width: 0; }
 a.big:hover { border-color: var(--k); }
-.notizen-schalter { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 13px; color: var(--muted, #666); cursor: pointer; user-select: none; }
-.notizen-schalter input { display: none; }
-.notizen-schalter .sw { width: 32px; height: 18px; border-radius: 9px; background: var(--line); position: relative; transition: background .15s; }
-.notizen-schalter .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: left .15s; }
-.notizen-schalter input:checked + .sw { background: var(--k); }
-.notizen-schalter input:checked + .sw::after { left: 16px; }
-.big .n { margin-left: auto; font-size: 12px; color: var(--k); }.bar .leser-link { text-decoration: none; margin-left: auto; color: inherit; }
+.notizen-wahl { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+.notizen-wahl button { border-radius: 999px; padding: 1px 10px; font-size: 13px; color: var(--muted); }
+.notizen-wahl button.on { background: var(--k); border-color: var(--k); color: #fff; }
+.big .n { margin-left: auto; font-size: 12px; color: var(--k); }
+.bar .leser-link { text-decoration: none; margin-left: auto; color: inherit; }
 .bar .leser-link ~ #logout { margin-left: 0; }
 .big .ic { width: 30px; height: 36px; border-radius: 5px; display: grid; place-items: center; font-size: 9px; font-weight: 700;
            color: #fff; background: #d1453b; flex: none; }
@@ -157,13 +152,12 @@ a.big:hover { border-color: var(--k); }
 </head>
 <body>
 <header id="header" hidden><div class="bar">
+  <nav class="courses" id="courses"></nav>
   <a class="ghost leser-link" href="/leser/" title="Skripte lesen, mit Stift, Notizen und verlinkten Definitionen">📖 Leser</a>
   <button class="ghost" id="logout" onclick="logout()">Abmelden</button>
 </div></header>
 <main>
   <div id="login"></div>
-  <div class="courses" id="courses"></div>
-  <div id="newCourse"></div>
   <div id="course"></div>
 </main>
 <input type="file" id="picker" multiple hidden accept="image/*,application/pdf,.md,.tex,.txt">
@@ -188,10 +182,9 @@ const store = {
 const S = {
   state: null, items: [], user: null, course: store.get("course", null), login: null,
   filter: store.get("filter", "alle"), open: new Set(store.get("open", [])),
-  newCourse: false, newItem: false, editItem: null, editCourse: false, md: {}, more: new Set(),
+  editItem: null, md: {}, more: new Set(),
   prioUpload: new Set(),  // Einträge, deren nächster Lösungsteil priorisiert hochgeladen wird
   upMenu: null,           // Eintrag, dessen Upload-Menü offen ist
-  upKurs: false, upKursItem: null,  // „Hochladen“ für den ganzen Kurs
 };
 
 const $ = (s) => document.querySelector(s);
@@ -254,7 +247,7 @@ async function showLogin() {
 function renderLogin() {
   const L = S.login;
   $("#header").hidden = true;
-  ["#courses", "#newCourse", "#course"].forEach((s) => $(s).innerHTML = "");
+  ["#courses", "#course"].forEach((s) => $(s).innerHTML = "");
   $("#login").innerHTML = `<form class="panel login" onsubmit="event.preventDefault();doLogin()">
     <input type="text" id="un" placeholder="Nutzername" autocomplete="username" autocapitalize="none" value="${esc(L.name)}">
     <input type="password" id="pw" placeholder="Passwort" autocomplete="current-password">
@@ -280,60 +273,33 @@ function render() {
   store.set("course", S.course); store.set("filter", S.filter); store.set("open", [...S.open]);
   $("#header").hidden = false;
   $("#logout").title = `Angemeldet als ${S.user}`;
-  $("#courses").innerHTML = S.state.courses.map((c) => {
-    const n = c.id === S.course ? S.items.length : null;
-    return `<button class="course ${c.id === S.course ? "on" : ""}" style="--c:${esc(c.farbe || FARBEN[0])}"
-      onclick="selectCourse(${c.id})"><b>${esc(c.kuerzel || c.name)}</b>
-      <small>${esc(c.kuerzel ? c.name : (c.semester || ""))}${n !== null ? ` · ${n} Einträge` : ""}</small></button>`;
-  }).join("") + `<button class="course add" onclick="S.newCourse=!S.newCourse;render()">+ Kurs</button>`;
-
-  $("#newCourse").innerHTML = S.newCourse ? courseForm({}, "createCourse()") : "";
+  // Fächer in der Kopfleiste, jedes in seiner Farbe; die Seite ist leicht in der Farbe des gewählten getönt
+  $("#courses").innerHTML = S.state.courses.map((c) =>
+    `<button class="course ${c.id === S.course ? "on" : ""}" style="--c:${esc(c.farbe || FARBEN[0])}"
+      onclick="selectCourse(${c.id})" title="${esc(c.name)}">${esc(c.kuerzel || c.name)}</button>`).join("");
+  const aktiv = S.state.courses.find((c) => c.id === S.course);
+  document.body.style.setProperty("--kurs", aktiv?.farbe || FARBEN[0]);
   $("#course").innerHTML = renderCourse();
   document.querySelectorAll(".drop").forEach(bindDrop);
 }
 
-function courseForm(c, onsave) {
-  const farbe = c.farbe || FARBEN[S.state.courses.length % FARBEN.length];
-  return `<div class="panel form" id="cform">
-    <input type="text" id="cf_name" placeholder="Kursname, z. B. Analysis für WiWi" value="${esc(c.name)}">
-    <input type="text" id="cf_kuerzel" placeholder="Kürzel (optional)" style="flex:0 1 140px" value="${esc(c.kuerzel)}">
-    <input type="text" id="cf_semester" placeholder="Semester" style="flex:0 1 110px" value="${esc(c.semester || "WiSe 26/27")}">
-    <div class="swatches">${FARBEN.map((f) => `<button class="swatch ${f === farbe ? "on" : ""}" style="--s:${f}" data-f="${f}"
-      onclick="document.querySelectorAll('.swatch').forEach(s=>s.classList.toggle('on',s===this))"></button>`).join("")}</div>
-    <button class="primary" onclick="${onsave}">Speichern</button>
-    <button class="ghost" onclick="S.newCourse=false;S.editCourse=false;render()">Abbrechen</button>
-  </div>`;
-}
-function readCourseForm() {
-  return { name: $("#cf_name").value.trim(), kuerzel: $("#cf_kuerzel").value.trim() || null,
-           semester: $("#cf_semester").value.trim() || null, farbe: $(".swatch.on")?.dataset.f };
-}
-
 function renderCourse() {
   const c = S.state.courses.find((c) => c.id === S.course);
-  if (!c) return `<div class="empty">Leg oben deinen ersten Kurs an.</div>`;
+  if (!c) return `<div class="empty">Noch kein Kurs.</div>`;
   // Pro Kurs gibt es ein Skript (der neueste Skript-Eintrag); die Timeline zeigt nur Blätter und Termine
   const skript = S.items.find((i) => i.art === "skript");
   if (S.filter === "skript") S.filter = "alle";
   const termine = S.items.filter((i) => i.art !== "skript");
   const counts = Object.fromEntries(Object.keys(ARTEN).map((a) => [a, termine.filter((i) => i.art === a).length]));
   const list = termine.filter((i) => S.filter === "alle" || i.art === S.filter);
-  let html = S.editCourse ? courseForm(c, `saveCourse(${c.id})`) : "";
-  html += `<div class="chead"><h2>${esc(c.name)}</h2>
-    <button class="ghost" onclick="S.editCourse=true;render()">Bearbeiten</button>
-    <button class="ghost" onclick="deleteCourse(${c.id})">Löschen</button>
-    <button class="primary" onclick="S.upKurs=!S.upKurs;render()">Hochladen</button>
-    <button class="primary" onclick="S.newItem=!S.newItem;S.editItem=null;render()">+ Eintrag</button></div>`;
-  if (S.upKurs) html += upKursPanel();
-  if (S.newItem) html += itemForm({}, "createItem()");
-  html += skript ? renderSkript(skript)
+  let html = skript ? renderSkript(skript)
     : `<div class="skript"><button class="drop" style="width:100%" onclick="neuesSkript()">+ Skript hochladen</button></div>`;
   html += `<div class="chips">
     <button class="chip ${S.filter === "alle" ? "on" : ""}" onclick="S.filter='alle';render()">Alle · ${termine.length}</button>
     ${Object.entries(ART_PLURAL).filter(([a]) => counts[a]).map(([a, n]) =>
       `<button class="chip ${S.filter === a ? "on" : ""}" onclick="S.filter='${a}';render()">${n} · ${counts[a]}</button>`).join("")}
   </div>`;
-  if (!list.length) return html + `<div class="empty">Noch keine Einträge. Lege z. B. „Übungsblatt 1“ an und lade das PDF hoch.</div>`;
+  if (!list.length) return html + `<div class="empty">Noch keine Einträge.</div>`;
 
   html += `<div class="timeline">`;
   let month = null;
@@ -354,7 +320,7 @@ function itemForm(it, onsave) {
     <input type="text" id="if_titel" placeholder="Titel, z. B. Kapitel 3: Differentialrechnung" value="${esc(it.titel)}">
     <input type="date" id="if_datum" value="${esc(it.datum || new Date().toISOString().slice(0, 10))}">
     <button class="primary" onclick="${onsave}">Speichern</button>
-    <button class="ghost" onclick="S.newItem=false;S.editItem=null;render()">Abbrechen</button>
+    <button class="ghost" onclick="S.editItem=null;render()">Abbrechen</button>
     ${it.id ? `<button class="ghost" style="color:var(--err)" onclick="delItem(${it.id})">Eintrag löschen</button>` : ""}
   </div>`;
 }
@@ -382,9 +348,17 @@ function renderSkript(it) {
   const stand = orig ? `Stand ${orig.created.slice(8, 10)}.${orig.created.slice(5, 7)}.` : "noch kein PDF";
   return `<div class="skript" style="--k:var(--skript)">${card(it, { fest: true, titel: `Skript <small>· ${stand}</small>` })}</div>`;
 }
+// Neben dem Eintrag keine Räume; bei Übungsblättern nur der Abgabetag, bei Tutorien Tag und Uhrzeit
+function kurzTitel(it) {
+  let t = (it.titel || "").split(/,\s*/).filter((p) => !/^([A-Z]{1,2} ?\d{3}|Raum|HS|Hörsaal)\b/.test(p)).join(", ");
+  if (it.art === "uebung") t = t.replace(/^Abgabe bis /, "Abgabe ").replace(/,\s*\d{1,2}[:.]\d{2}( Uhr)?$/, "");
+  if (it.art === "tutorium") t = t.replace(/^Tutorium\s*/, "");
+  return t;
+}
 function card(it, { fest = false, titel = null } = {}) {
   const open = fest || S.open.has(it.id);
-  const title = titel ?? `${ARTEN[it.art]}${it.nummer ? " " + esc(it.nummer) : ""}${it.titel ? ` <small>· ${esc(it.titel)}</small>` : ""}`;
+  const kurz = kurzTitel(it);
+  const title = titel ?? `${ARTEN[it.art]}${it.nummer ? " " + esc(it.nummer) : ""}${kurz ? ` <small>· ${esc(kurz)}</small>` : ""}`;
   let html = `<div class="card">
     <div class="top" ${fest ? "" : `onclick="toggle(${it.id})"`}>
       <span class="kind">${fest ? "Skript" : ARTEN[it.art]}</span>
@@ -399,7 +373,7 @@ function card(it, { fest = false, titel = null } = {}) {
     const blatt = it.art === "uebung" || it.art === "tutorium";
     html += `<div class="body">${trio(it)}${blatt ? loesungsTeile(it) : ""}<div class="more">
       <button class="ghost" onclick="S.more.${more ? "delete" : "add"}(${it.id});render()">${more ? "Weniger" : "Mehr"}</button>
-      <button class="ghost" onclick="S.editItem=${it.id};S.newItem=false;render()">Bearbeiten</button></div>`;
+      <button class="ghost" onclick="S.editItem=${it.id};render()">Bearbeiten</button></div>`;
     if (S.editItem === it.id) html += itemForm(it, `saveItem(${it.id})`);
     if (more) html += `<div class="details">${details(it)}${renderJobs(it)}</div>`;
     html += `</div>`;
@@ -450,18 +424,29 @@ function neueste(files) {
   const pdf = files.filter((f) => f.name.toLowerCase().endsWith(".pdf"));
   return (pdf.length ? pdf : files).at(-1);
 }
-// Schalter „Notizen“ je Eintrag, gemerkt pro Gerät
-function notizenAn(id) { return store.get("notizen", []).includes(id); }
-function setNotizen(id, an) {
-  const ids = store.get("notizen", []).filter((x) => x !== id);
-  store.set("notizen", an ? [...ids, id] : ids);
+// „Notizen: Carl Emil“ je Eintrag: wessen Notizen im Leser zu sehen sind, gemerkt pro Gerät
+// (der Leser liest dieselbe Auswahl aus localStorage; ohne Auswahl öffnen die Kacheln die reine PDF)
+function sicht(id) { return store.get("notizenSicht", {})[id] ?? []; }
+function toggleSicht(id, user) {
+  const alle = store.get("notizenSicht", {});
+  const v = alle[id] ?? [];
+  alle[id] = v.includes(user) ? v.filter((u) => u !== user) : [...v, user];
+  store.set("notizenSicht", alle);
   render();
+}
+// früherer Schalter „Notizen“ (eine gemeinsame Fassung): eingeschaltete Einträge zeigen alle
+if (localStorage.getItem("wima.notizen") !== null) {
+  const alle = store.get("notizenSicht", {});
+  for (const id of store.get("notizen", [])) alle[id] ??= ["Carl", "Emil"];
+  store.set("notizenSicht", alle);
+  localStorage.removeItem("wima.notizen");
 }
 function trio(it) {
   const laeuft = (typ) => it.jobs.some((j) => j.typ === typ && (typ !== "personalisieren" || j.owner === S.user)
                                          && (j.status === "offen" || j.status === "laeuft"));
-  // Schalter „Notizen“: an = die Fassungen öffnen im Leser mit den gemeinsamen Notizen (Stift, Zettel …), aus = reine PDF
-  const mitNotizen = notizenAn(it.id);
+  // Mindestens ein Nutzer gewählt: die Fassungen öffnen im Leser mit dessen Notizen (Stift, Zettel …), sonst reine PDF
+  const gewaehlt = sicht(it.id);
+  const mitNotizen = gewaehlt.length > 0;
   const kachel = (label, f, typ) => {
     if (!f) return `<div class="big leer ${typ && laeuft(typ) ? "laeuft" : ""}"><span class="ic"></span>${label}</div>`;
     const ic = `<span class="ic">${esc((f.name.split(".").pop() || "").toUpperCase().slice(0, 4))}</span>`;
@@ -469,14 +454,14 @@ function trio(it) {
     const n = it.notizen?.[f.rolle];
     if (mitNotizen && pdf)
       return `<a class="big" href="/leser/#/wima/${f.id}" target="_blank" title="${esc(f.name)} mit Notizen öffnen">${ic}${label}
-        <span class="n">✎ ${n ? `${esc(n.von)}, ${n.geaendert.slice(8, 10)}.${n.geaendert.slice(5, 7)}.` : "Notizen"}</span></a>`;
-    return `<a class="big" href="/files/${f.id}" target="_blank" title="${esc(f.name)}">${ic}${label}${pdf && n ? `<span class="n" title="Hat Notizen – Schalter „Notizen“ an">✎</span>` : ""}</a>`;
+        <span class="n">✎${n ? ` ${n.geaendert.slice(8, 10)}.${n.geaendert.slice(5, 7)}.` : ""}</span></a>`;
+    return `<a class="big" href="/files/${f.id}" target="_blank" title="${esc(f.name)}">${ic}${label}${pdf && n ? `<span class="n" title="Hat Notizen – oben bei „Notizen“ Nutzer wählen">✎</span>` : ""}</a>`;
   };
   const orig = neueste(shared(it, "original"));
   const lang = it.art === "skript";
   const loesung = it.art === "uebung" || it.art === "tutorium";
-  return `<label class="notizen-schalter" title="Alle Fassungen mit den gemeinsamen Notizen öffnen – mit Stift, Zetteln und verlinkten Definitionen">
-      <input type="checkbox" ${mitNotizen ? "checked" : ""} onchange="setNotizen(${it.id}, this.checked)"><span class="sw"></span>Notizen</label>
+  return `<div class="notizen-wahl" title="Wessen Notizen im Leser zu sehen sind – mit Stift, Zetteln und verlinkten Definitionen">Notizen:
+      ${(S.state.users || []).map((u) => `<button class="${gewaehlt.includes(u) ? "on" : ""}" onclick="toggleSicht(${it.id},'${esc(u)}')">${esc(u)}</button>`).join("")}</div>
   <div class="trio" style="--n:${lang || loesung ? 3 : 2}">
     ${orig ? kachel("Original", orig) : `<div class="big leer drop" data-item="${it.id}" data-rolle="original" data-owner=""><span class="ic"></span>Original</div>`}
     ${kachel("Verbessert", neueste(shared(it, "verbessert")), "verbessern")}
@@ -500,23 +485,9 @@ function waehleUpload(itemId, ziel) {
   const z = ZIELE[ziel];
   if (z.prio) S.prioUpload.add(itemId); else S.prioUpload.delete(itemId);
   dropTarget = { item: String(itemId), rolle: z.rolle, owner: z.privat ? S.user : "" };
-  S.upMenu = null; S.upKurs = false;
+  S.upMenu = null;
   $("#picker").click();
 }
-function upKursPanel() {
-  // Vorauswahl: der Eintrag, dessen Datum heute am nächsten liegt (bevorzugt der jüngste vergangene)
-  const heute = new Date().toISOString().slice(0, 10);
-  const sortiert = [...S.items].sort((a, b) => (b.datum || "").localeCompare(a.datum || ""));
-  const id = S.upKursItem ?? (sortiert.find((i) => (i.datum || "") <= heute) || sortiert[0])?.id;
-  const it = S.items.find((i) => i.id === id);
-  if (!it) return `<div class="panel upkurs">Lege zuerst einen Eintrag an.</div>`;
-  return `<div class="panel upkurs">
-    <select id="up_item" onchange="S.upKursItem=+this.value;render()">${sortiert.map((i) =>
-      `<option value="${i.id}" ${i.id === it.id ? "selected" : ""}>${fmtDate(i.datum)} · ${ARTEN[i.art]}${i.nummer ? " " + esc(i.nummer) : ""}${i.titel ? " · " + esc(i.titel) : ""}</option>`).join("")}</select>
-    ${upZiele(it).map(([k, label]) => `<button onclick="waehleUpload(${it.id},'${k}')">${label}</button>`).join("")}
-    <button class="ghost" onclick="S.upKurs=false;render()">Abbrechen</button></div>`;
-}
-
 // Lösungen und Notizen (für alle), aus denen Claude die eine saubere „Lösung“ baut
 function loesungsTeile(it) {
   const fertig = shared(it, "loesung");
@@ -563,22 +534,8 @@ function renderJobs(it) {
 }
 
 // ---------------------------------------------------------------- Aktionen
-async function selectCourse(id) { S.course = id; S.filter = "alle"; S.newItem = false; S.editCourse = false; await loadItems(); render(); }
+async function selectCourse(id) { S.course = id; S.filter = "alle"; S.editItem = null; await loadItems(); render(); }
 function toggle(id) { S.open.has(id) ? S.open.delete(id) : S.open.add(id); render(); }
-async function createCourse() {
-  const c = readCourseForm(); if (!c.name) return;
-  const res = await api("POST", "/api/courses", c);
-  S.newCourse = false; S.course = res.id; await refresh();
-}
-async function saveCourse(id) { await api("PATCH", `/api/courses/${id}`, readCourseForm()); S.editCourse = false; await refresh(); }
-async function deleteCourse(id) {
-  if (!confirm("Kurs mit allen Einträgen und Dateien löschen?")) return;
-  await api("DELETE", `/api/courses/${id}`); S.course = null; await refresh();
-}
-async function createItem() {
-  const it = await api("POST", "/api/items", { ...readItemForm(), course_id: S.course });
-  S.newItem = false; S.open.add(it.id); await refresh();
-}
 async function neuesSkript() {
   const it = await api("POST", "/api/items", { course_id: S.course, art: "skript", nummer: "1", titel: "Skript",
                                               datum: new Date().toISOString().slice(0, 10) });
@@ -646,7 +603,7 @@ setInterval(async () => {
   if (!busy) return;
   const typing = ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName);
   await loadItems();
-  if (!(typing || S.newCourse || S.newItem || S.editItem || S.editCourse)) render();
+  if (!(typing || S.editItem)) render();
 }, 15000);
 refresh();
 </script>

@@ -14,14 +14,17 @@ interface Props {
   height: number;
   scale: number;
   strokes: Stroke[];
+  fixed?: Stroke[]; // nur angezeigt, nicht radierbar (Notizen anderer Wima-Nutzer)
   tool: InkToolState | null; // null = Zeichnen aus
   onAdd: (page: number, s: Stroke) => void;
   onErase: (page: number, ids: string[]) => void;
 }
 
+const NO_FIXED: Stroke[] = [];
+
 // Gezeichnet, markiert und radiert wird ausschließlich mit dem Apple Pencil (pointerType "pen").
 // Finger (und Maus) scrollen bzw. zoomen nur.
-function InkLayerImpl({ page, width, height, scale, strokes, tool, onAdd, onErase }: Props) {
+function InkLayerImpl({ page, width, height, scale, strokes, fixed = NO_FIXED, tool, onAdd, onErase }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const current = useRef<{ pointerId: number; stroke: Stroke } | null>(null);
   const erasing = useRef<number | null>(null);
@@ -36,8 +39,8 @@ function InkLayerImpl({ page, width, height, scale, strokes, tool, onAdd, onEras
     c.height = Math.round(height * scale * dpr);
     const ctx = c.getContext("2d")!;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    drawStrokes(ctx, strokes, scale);
-  }, [strokes, scale, width, height, dpr]);
+    drawStrokes(ctx, [...fixed, ...strokes], scale);
+  }, [strokes, fixed, scale, width, height, dpr]);
 
   // Safari/iPad: Apple Pencil darf die Seite nicht scrollen, Finger schon
   useEffect(() => {
@@ -113,7 +116,7 @@ function InkLayerImpl({ page, width, height, scale, strokes, tool, onAdd, onEras
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvasRef.current!.width, canvasRef.current!.height);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      drawStrokes(ctx, [...strokes, cur.stroke], scale);
+      drawStrokes(ctx, [...fixed, ...strokes, cur.stroke], scale);
     }
   };
 

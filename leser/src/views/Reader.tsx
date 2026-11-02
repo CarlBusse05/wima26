@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { watchShared } from "../lib/wima";
+import { onSicht, setSichtbar, sichtbar, watchShared, wimaNutzer } from "../lib/wima";
 import { get, put, uid, type Entry, type EntryKind, type Script, type ScriptIndex } from "../lib/db";
 import { drawStrokes, exportWithInk, inkCount, type Annotations, type CompareItem, type OrphanInk, type PageInk, type StickyNote, type Stroke } from "../lib/ink";
 import CompareView from "../components/CompareView";
@@ -243,6 +243,42 @@ export default function Reader({ scriptId, initialPage }: { scriptId: string; in
       unwatch();
     };
   }, [scriptId, !!script?.wima]);
+
+  // Skripte aus Wima: Wessen Notizen zu sehen sind, wird in Wima gewählt; bearbeiten lassen sich nur die eigenen
+  const wimaItem = script?.wima?.item;
+  const [ich, setIch] = useState<string | null>(null);
+  const [sicht, setSicht] = useState<string[]>([]);
+  const [nutzer, setNutzer] = useState<string[]>([]);
+  useEffect(() => {
+    if (wimaItem === undefined) return;
+    setSicht(sichtbar(wimaItem));
+    wimaNutzer().then((w) => {
+      setIch(w.user);
+      setNutzer(w.users);
+    }, () => {});
+    return onSicht(wimaItem, setSicht);
+  }, [wimaItem]);
+  const wimaAn = wimaItem !== undefined && ich !== null;
+  const zeigt = useCallback((von?: string) => !wimaAn || !von || sicht.includes(von), [wimaAn, sicht]);
+  const teilCache = useMemo(() => new WeakMap<Stroke[], { own: Stroke[]; fixed: Stroke[] }>(), [wimaAn, sicht, ich]);
+  /** Striche einer Seite: eigene (bearbeitbar) und fremde sichtbare (nur angezeigt). */
+  const teile = (list: Stroke[]) => {
+    if (!wimaAn) return { own: list, fixed: NO_STROKES };
+    let r = teilCache.get(list);
+    if (!r) {
+      const own = list.filter((x) => zeigt(x.von) && (!x.von || x.von === ich));
+      const fixed = list.filter((x) => zeigt(x.von) && x.von && x.von !== ich);
+      r = { own: own.length === list.length ? list : own, fixed: fixed.length ? fixed : NO_STROKES };
+      teilCache.set(list, r);
+    }
+    return r;
+  };
+  /** Neue eigene Notiz: Autor eintragen und die eigenen Notizen einblenden. */
+  const alsEigene = useCallback(<T extends { von?: string }>(x: T): T => {
+    if (!wimaAn) return x;
+    if (!sicht.includes(ich!)) setSichtbar(wimaItem!, [...sicht, ich!]);
+    return { ...x, von: ich! };
+  }, [wimaAn, sicht, ich, wimaItem]);
 
   // ---------- Geometrie ----------
   // wird vor jeder Größenänderung des Lesebereichs aufgerufen (Notizfeld, Index, Drehen des iPads)
@@ -612,7 +648,10 @@ export default function Reader({ scriptId, initialPage }: { scriptId: string; in
     setInkVisible(true);
   };
 
-  const onInkAdd = useCallback((page: number, stroke: Stroke) => pushOp({ type: "add", page, strokes: [stroke] }), [pushOp]);
+  const onInkAdd = useCallback(
+    (page: number, stroke: Stroke) => pushOp({ type: "add", page, strokes: [alsEigene(stroke)] }),
+    [pushOp, alsEigene],
+  );
 
   const inkRef = useRef(ink);
   useEffect(() => {
@@ -1057,7 +1096,7 @@ export default function Reader({ scriptId, initialPage }: { scriptId: string; in
   };
   const placeNoteAt = (page: number, x: number, y: number) => {
     const now = nowMs();
-    const n: StickyNote = { id: uid(), page, x, y, html: "", createdAt: now, updatedAt: now };
+    const n = alsEigene<StickyNote>({ id: uid(), page, x, y, html: "", createdAt: now, updatedAt: now });
     if (openNoteId) closeNote(true);
     setNotes((list) => [...list, n]);
     openNote(n);
@@ -1421,14 +1460,14 @@ export default function Reader({ scriptId, initialPage }: { scriptId: string; in
       const np = pages[compareItem.newPage - 1];
       return [
         ...(oldEl ? [{ id: "old", page: compareItem.oldPage, el: oldEl, width: compareItem.oldText.width, strokes: compareItem.strokes, notes: compareItem.notes, readOnly: true }] : []),
-        ...(newEl && np ? [{ id: "new", page: compareItem.newPage, el: newEl, width: np.width, strokes: ink[compareItem.newPage] ?? NO_STROKES }] : []),
+        ...(newEl && np ? [{ id: "new", page: compareItem.newPage, el: newEl, width: np.width, strokes: teile(ink[compareItem.newPage] ?? NO_STROKES).own }] : []),
       ];
     }
     const out: LassoTarget[] = [];
     for (const el of scrollRef.current?.querySelectorAll<HTMLElement>(".page[data-page]") ?? []) {
       const n = Number(el.dataset.page);
       const p = pages[n - 1];
-      if (p) out.push({ id: "p" + n, page: n, el, width: p.width, strokes: ink[n] ?? NO_STROKES });
+      if (p) out.push({ id: "p" + n, page: n, el, width: p.width, strokes: teile(ink[n] ?? NO_STROKES).own });
     }
     return out;
   };
@@ -1537,6 +1576,21 @@ export default function Reader({ scriptId, initialPage }: { scriptId: string; in
           />{" "}
           / {pages.length}
         </span>
+        {wimaAn && nutzer.length > 0 && (
+          <span className="wima-sicht" title="Wessen Notizen zu sehen sind – bearbeiten lassen sich nur die eigenen">
+            <span className="muted small">Notizen:</span>
+            {nutzer.map((u) => (
+              <button
+                key={u}
+                className={"wima-chip" + (sicht.includes(u) ? " on" : "")}
+                aria-pressed={sicht.includes(u)}
+                onClick={() => setSichtbar(wimaItem!, sicht.includes(u) ? sicht.filter((x) => x !== u) : [...sicht, u])}
+              >
+                {u}
+              </button>
+            ))}
+          </span>
+        )}
         <span style={{ flex: 1 }} />
         <input
           className="input"
@@ -1748,7 +1802,8 @@ export default function Reader({ scriptId, initialPage }: { scriptId: string; in
                     search={searchRe}
                     flash={flash && flash.page === p.page ? flash : null}
                     ink={{
-                      strokes: lassoHide?.page === p.page ? hiddenStrokes : (ink[p.page] ?? NO_STROKES),
+                      strokes: teile(lassoHide?.page === p.page ? hiddenStrokes : (ink[p.page] ?? NO_STROKES)).own,
+                      fixed: teile(ink[p.page] ?? NO_STROKES).fixed,
                       visible: inkVisible,
                       tool: inkTool,
                       onAdd: onInkAdd,
@@ -1802,7 +1857,7 @@ export default function Reader({ scriptId, initialPage }: { scriptId: string; in
             {doc &&
               notes.map((n) => {
                 const p = pages[n.page - 1];
-                if (!p) return null;
+                if (!p || !zeigt(n.von)) return null;
                 const left = Math.max(0, (viewW - p.width * scale) / 2);
                 // das Symbol wächst und schrumpft mit der Seite (Zoom, Notizfeld)
                 const size = Math.round(Math.min(40, Math.max(12, 20 * scale)));

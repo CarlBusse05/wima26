@@ -30,6 +30,7 @@ export interface Stroke {
   color: string; // #rrggbb
   width: number; // Seiteneinheiten (= pt)
   points: number[]; // flach: x, y, Druck, x, y, Druck, …
+  von?: string; // Wima-Nutzer, der den Strich gezeichnet hat (Skripte aus Wima)
 }
 
 export type PageInk = Record<number, Stroke[]>;
@@ -68,6 +69,7 @@ export interface StickyNote {
   color?: string; // #rrggbb – ohne: Standard (weiß/grau)
   createdAt: number;
   updatedAt: number;
+  von?: string; // Wima-Nutzer, der den Zettel angelegt hat
 }
 
 export interface OrphanInk {

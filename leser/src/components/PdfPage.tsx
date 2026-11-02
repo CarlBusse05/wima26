@@ -15,6 +15,7 @@ interface Props {
   flash: { y: number; h: number; key: number } | null;
   ink: {
     strokes: Stroke[];
+    fixed?: Stroke[];
     visible: boolean;
     tool: InkToolState | null;
     onAdd: (page: number, s: Stroke) => void;
@@ -166,6 +167,7 @@ function PdfPageImpl({ doc, page, scale, render, linker, search, flash, ink }: P
           height={page.height}
           scale={scale}
           strokes={ink.strokes}
+          fixed={ink.fixed}
           tool={ink.tool}
           onAdd={ink.onAdd}
           onErase={ink.onErase}

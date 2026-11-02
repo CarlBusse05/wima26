@@ -716,3 +716,6 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; color:
   background: #1f2937; color: #fff; font-size: 14px; box-shadow: 0 4px 16px rgba(0, 0, 0, .2); cursor: pointer;
 }
 .wima-banner.warn { background: #b45309; }
+.wima-sicht { display: inline-flex; align-items: center; gap: 4px; }
+.wima-chip { border: 1px solid var(--border); background: transparent; color: inherit; border-radius: 999px; padding: 2px 10px; font: inherit; font-size: 13px; cursor: pointer; opacity: .6; }
+.wima-chip.on { background: var(--accent, #2f5d8a); border-color: var(--accent, #2f5d8a); color: #fff; opacity: 1; }
