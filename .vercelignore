@@ -17,4 +17,4 @@ __pycache__/
 .venv/
 
 # Quellcode des Lesers; ausgeliefert wird nur der Build in public/leser
-leser/
+/leser/
