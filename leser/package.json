@@ -1,0 +1,55 @@
+{
+  "name": "mathe-studium",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "check:safari": "node scripts/check-safari.mjs && es-check es2022 --module 'dist/assets/*.js'",
+    "test:safari": "node tests/safari/smoke.cjs",
+    "test:linking": "node tests/linking/check.cjs && node tests/linking/wordforms.cjs",
+    "test:versions": "node tests/versions/check.cjs",
+    "test:compare": "node tests/versions/compare.cjs",
+    "test:snip": "node tests/safari/snip.cjs",
+    "test:docdate": "node tests/library/docdate.cjs",
+    "test:notes": "node tests/safari/notes.cjs",
+    "test:lookup": "node tests/safari/lookup.cjs",
+    "test:pinch": "node tests/safari/pinch.cjs",
+    "test:notepos": "node tests/safari/notepos.cjs",
+    "test:notedraw": "node tests/safari/notedraw.cjs",
+    "test:lasso": "node tests/safari/lasso.cjs",
+    "test:inkbar": "node tests/safari/inkbar.cjs",
+    "test:jump": "node tests/safari/jump.cjs",
+    "test:notesafari": "node tests/safari/notesafari.cjs",
+    "test:noteimage": "node tests/safari/noteimage.cjs"
+  },
+  "dependencies": {
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^6.4.299",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@mdn/browser-compat-data": "^6.1.5",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "es-check": "^9.8.1",
+    "eslint": "^9.39.5",
+    "eslint-plugin-compat": "^6.2.1",
+    "oxlint": "^1.89.0",
+    "typescript": "~7.0.2",
+    "vite": "^8.3.5"
+  },
+  "browserslist": [
+    "safari >= 16.4",
+    "ios_saf >= 16.4",
+    "chrome >= 111",
+    "firefox >= 114",
+    "edge >= 111"
+  ]
+}

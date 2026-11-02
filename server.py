@@ -32,6 +32,8 @@ Cookie "wima" oder "Authorization: Bearer <token>"; lokal zusaetzlich — nur vo
   PATCH  /api/files/<id>                 <- {prio}  (nur Loesungsteile)
   DELETE /api/files/<id>
   GET    /files/<id>                     Datei selbst
+  GET    /api/notizen?item=&rolle=       -> gemeinsamer Notizstand des Lesers ({} = keiner)
+  PUT    /api/notizen?item=&rolle=&rev=&basis=&vergleich=&quelle=   Body = JSON; 409 {stand}, wenn rev veraltet
   POST   /api/jobs                       <- {item_id, typ, hinweis}
   POST   /api/jobs/<id>/retry | /done | /fail
   DELETE /api/jobs/<id>
@@ -42,7 +44,8 @@ Cookie "wima" oder "Authorization: Bearer <token>"; lokal zusaetzlich — nur vo
 Automatik: Neues Original -> Job "verbessern";
 neuer/geloeschter/umgeschalteter Loesungsteil -> Job "loesung" (spaeter=1: noch kein Job, weitere
 Dateien folgen);
-"personalisieren" ("Fuer <Name>") startet nie automatisch, nur per Knopf.
+"personalisieren" ("Fuer <Name>") ist abgeschaltet (seit 02.11.): keine neuen Jobs, offene werden nicht mehr
+abgeholt. Stattdessen gemeinsame Notizen im Leser (leser/, Tabelle notizen, Schalter „Notizen“ je Eintrag).
 Gemeinsame Jobs (verbessern, lang, loesung) nimmt der Worker dessen, der sie angestossen hat, zuerst;
 laeuft der nicht, uebernimmt sie jeder andere Worker. Persoenliche Jobs bleiben beim Besitzer.
 Vorausplanung: Beim Laden eines Kurses legt vorplanen() die naechsten Uebungsblaetter und Tutorien
@@ -77,7 +80,10 @@ USERS = [u.strip() for u in os.environ.get("WIMA_USERS", "Carl,Emil").split(",")
 ARTEN = ["skript", "uebung", "tutorium", "sonstiges"]
 HAUPT = os.environ.get("WIMA_HAUPT") or USERS[0]  # erledigt die gemeinsamen Jobs
 ROLLEN = ["original", "musterloesung", "verbessert", "lang", "fuer", "foto", "notiz",
-          "aufbereitet", "vergleich", "begleitskript", "herde", "loesungsteil", "loesung"]
+          "aufbereitet", "vergleich", "begleitskript", "herde", "loesungsteil", "loesung",
+          "notizbasis", "notizdaten"]  # notiz*: intern fuer gemeinsame Notizen (nicht in der Dateiliste)
+NOTIZ_INTERN = ("notizbasis", "notizdaten")
+NOTIZ_FASSUNGEN = ("original", "verbessert", "lang", "loesung")
 JOB_TYPEN = {
     # typ: Rolle der Ergebnisdateien, Ergebnis gehoert dem Nutzer (False = allen)
     "aufbereiten":       ("aufbereitet", True),
@@ -105,9 +111,10 @@ def safe_name(name):
 
 
 class ApiError(Exception):
-    def __init__(self, status, msg):
+    def __init__(self, status, msg, **extra):
         super().__init__(msg)
         self.status = status
+        self.extra = extra  # weitere Felder fuer die Antwort, z. B. der aktuelle Stand bei 409
 
 
 def insert(con, sql, params):
@@ -213,10 +220,14 @@ def course_items(course_id, user):
         marks = ",".join("?" * len(ids))
         files = rows(con.execute(
             f"SELECT id,item_id,rolle,owner,name,mime,groesse,job_id,created,prio FROM files "
-            f"WHERE item_id IN ({marks}) ORDER BY id", ids))
+            f"WHERE item_id IN ({marks}) AND rolle NOT IN ('notizbasis','notizdaten') ORDER BY id", ids))
+        notizen = rows(con.execute(
+            f"SELECT item_id,rolle,rev,geaendert,von FROM notizen WHERE item_id IN ({marks})", ids))
         jobs = rows(con.execute(
             f"SELECT * FROM jobs WHERE item_id IN ({marks}) ORDER BY id DESC", ids))
-    by_id = {i["id"]: dict(i, files=[], jobs=[]) for i in items}
+    by_id = {i["id"]: dict(i, files=[], jobs=[], notizen={}) for i in items}
+    for n in notizen:
+        by_id[n["item_id"]]["notizen"][n["rolle"]] = {k: n[k] for k in ("rev", "geaendert", "von")}
     for f in files:
         by_id[f["item_id"]]["files"].append(f)
     for j in jobs:
@@ -298,6 +309,56 @@ def save_upload(qs, data, user):
         return one(con.execute("SELECT * FROM files WHERE id=?", (fid,)))
 
 
+# ---------------------------------------------------------------- Gemeinsame Notizen (Leser)
+def notiz_stand(item, rolle):
+    with db() as con:
+        return one(con.execute("SELECT * FROM notizen WHERE item_id=? AND rolle=?", (item, rolle)))
+
+
+def notizen_lesen(qs):
+    item, rolle = int(qs.get("item", ["0"])[0]), qs.get("rolle", [""])[0]
+    return notiz_stand(item, rolle) or {}
+
+
+def notizen_schreiben(qs, data, user):
+    """Neuer Notizstand. rev = Stand, auf dem der Leser aufbaut; passt er nicht mehr (jemand anderes hat
+    inzwischen gespeichert), gibt es 409 samt aktuellem Stand und der Leser fuehrt zusammen."""
+    item, rolle = int(qs.get("item", ["0"])[0]), qs.get("rolle", [""])[0]
+    if rolle not in NOTIZ_FASSUNGEN:
+        raise ApiError(400, f"rolle muss eins von {NOTIZ_FASSUNGEN} sein")
+    zahl = lambda k: int(qs.get(k, [""])[0] or 0) or None
+    rev, basis, vergleich, quelle = zahl("rev") or 0, zahl("basis"), zahl("vergleich"), zahl("quelle")
+    with db() as con:
+        alt = one(con.execute("SELECT * FROM notizen WHERE item_id=? AND rolle=?", (item, rolle)))
+        if (alt["rev"] if alt else 0) != rev:
+            raise ApiError(409, "inzwischen geaendert", stand=alt)
+        for fid in (basis, vergleich, quelle):
+            if fid and not one(con.execute("SELECT 1 AS x FROM files WHERE id=? AND item_id=?", (fid, item))):
+                raise ApiError(400, f"Datei {fid} gehoert nicht zu diesem Eintrag")
+        did = insert(con, "INSERT INTO files(item_id,rolle,owner,name,mime,groesse,created) VALUES(?,?,?,?,?,?,?)",
+                     (item, "notizdaten", None, f"notizen_{rolle}.json", "application/json", len(data), now()))
+        con.execute("UPDATE files SET pfad=? WHERE id=?",
+                    (store.datei_speichern(did, f"notizen_{rolle}.json", data, "application/json"), did))
+        neu = (rev + 1, did, basis, vergleich, quelle, now(), user)
+        if alt:
+            con.execute("UPDATE notizen SET rev=?, daten_id=?, basis_id=?, vergleich_id=?, quelle_id=?, geaendert=?, von=? "
+                        "WHERE item_id=? AND rolle=?", neu + (item, rolle))
+        else:
+            con.execute("INSERT INTO notizen(rev,daten_id,basis_id,vergleich_id,quelle_id,geaendert,von,item_id,rolle) "
+                        "VALUES(?,?,?,?,?,?,?,?,?)", neu + (item, rolle))
+        # interne Dateien, auf die kein Stand mehr zeigt, wegraeumen
+        weg = rows(con.execute(
+            "SELECT id, pfad FROM files WHERE item_id=? AND rolle IN ('notizbasis','notizdaten') AND id NOT IN "
+            "(SELECT x FROM (SELECT daten_id AS x FROM notizen WHERE item_id=? UNION SELECT basis_id FROM notizen "
+            "WHERE item_id=? UNION SELECT vergleich_id FROM notizen WHERE item_id=?) u WHERE x IS NOT NULL) "
+            "AND id < ?", (item, item, item, item, did)))
+        for w in weg:
+            con.execute("DELETE FROM files WHERE id=?", (w["id"],))
+        stand = one(con.execute("SELECT * FROM notizen WHERE item_id=? AND rolle=?", (item, rolle)))
+    store.dateien_loeschen([w["pfad"] for w in weg])
+    return stand
+
+
 def set_prio(fid, body):
     with db() as con:
         f = one(con.execute("SELECT * FROM files WHERE id=?", (fid,)))
@@ -338,6 +399,8 @@ def queue_job(con, item_id, typ, owner, hinweis=None):
 def create_job(body, user):
     if body.get("typ") not in JOB_TYPEN:
         raise ApiError(400, f"typ muss eins von {list(JOB_TYPEN)} sein")
+    if body["typ"] == "personalisieren":  # „Für <Name>“ gibt es nicht mehr; gemeinsame Notizen im Leser stattdessen
+        raise ApiError(400, "„Für <Name>“ gibt es nicht mehr")
     # Wer den Job anstoesst, dessen Worker nimmt ihn zuerst; gemeinsame Jobs darf aber
     # jeder laufende Worker uebernehmen (siehe claim), damit nichts auf einen Rechner wartet.
     with db() as con:
@@ -447,7 +510,7 @@ def claim(user):
         # "personalisieren" auf beide, sonst arbeiten sie mit einer veralteten Grundlage
         job = one(con.execute(
             "UPDATE jobs SET status='laeuft', started=?, owner=? WHERE id=(SELECT j.id FROM jobs j "
-            f"WHERE j.status='offen' AND (j.owner=? OR j.typ IN ({gemeinsam})) "
+            f"WHERE j.status='offen' AND j.typ<>'personalisieren' AND (j.owner=? OR j.typ IN ({gemeinsam})) "
             "AND NOT EXISTS (SELECT 1 FROM jobs v WHERE v.item_id=j.item_id AND v.status IN ('offen','laeuft') "
             "AND ((j.typ='lang' AND v.typ='verbessern') "
             "OR (j.typ='personalisieren' AND v.typ IN ('verbessern','lang')))) "
@@ -566,6 +629,10 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json(set_prio(int(parts[2]), self.body_json()))
         if method == "DELETE" and m(r"/api/files/\d+"):
             return self.send_json(delete_file(int(parts[2])))
+        if method == "GET" and p == "/api/notizen":
+            return self.send_json(notizen_lesen(qs))
+        if method == "PUT" and p == "/api/notizen":
+            return self.send_json(notizen_schreiben(qs, self.body_bytes(), user))
         if method == "POST" and p == "/api/jobs":
             return self.send_json(create_job(self.body_json(), user))
         if method == "POST" and m(r"/api/jobs/\d+/(retry|done|fail)"):
@@ -616,7 +683,7 @@ class Handler(SimpleHTTPRequestHandler):
                     return super().do_GET()
                 self.send_json({"error": "nicht erlaubt"}, 405)
         except ApiError as e:
-            self.send_json({"error": str(e)}, e.status)
+            self.send_json({"error": str(e), **e.extra}, e.status)
         except (ValueError, KeyError, TypeError) as e:
             self.send_json({"error": f"Ungueltige Anfrage: {e}"}, 400)
         except Exception as e:  # z. B. Datenbank oder Blob nicht erreichbar

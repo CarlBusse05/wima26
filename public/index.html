@@ -87,6 +87,14 @@ main { max-width: 1040px; margin: 0 auto; padding: 16px 16px 80px; }
 .big { display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 10px;
        background: var(--bg); color: var(--ink); text-decoration: none; font-weight: 600; min-width: 0; }
 a.big:hover { border-color: var(--k); }
+.notizen-schalter { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 13px; color: var(--muted, #666); cursor: pointer; user-select: none; }
+.notizen-schalter input { display: none; }
+.notizen-schalter .sw { width: 32px; height: 18px; border-radius: 9px; background: var(--line); position: relative; transition: background .15s; }
+.notizen-schalter .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: left .15s; }
+.notizen-schalter input:checked + .sw { background: var(--k); }
+.notizen-schalter input:checked + .sw::after { left: 16px; }
+.big .n { margin-left: auto; font-size: 12px; color: var(--k); }.bar .leser-link { text-decoration: none; margin-left: auto; color: inherit; }
+.bar .leser-link ~ #logout { margin-left: 0; }
 .big .ic { width: 30px; height: 36px; border-radius: 5px; display: grid; place-items: center; font-size: 9px; font-weight: 700;
            color: #fff; background: #d1453b; flex: none; }
 .big.leer { color: var(--muted); font-weight: 500; border-style: dashed; background: transparent; }
@@ -149,6 +157,7 @@ a.big:hover { border-color: var(--k); }
 </head>
 <body>
 <header id="header" hidden><div class="bar">
+  <a class="ghost leser-link" href="/leser/" title="Skripte lesen, mit Stift, Notizen und verlinkten Definitionen">📖 Leser</a>
   <button class="ghost" id="logout" onclick="logout()">Abmelden</button>
 </div></header>
 <main>
@@ -358,7 +367,7 @@ const anyOf = (it, rolle) => it.files.filter((f) => f.rolle === rolle);
 
 function summary(it) {
   const p = [];
-  const offen = it.jobs.filter((j) => j.status === "offen" || j.status === "laeuft");
+  const offen = it.jobs.filter((j) => (j.status === "offen" || j.status === "laeuft") && j.typ !== "personalisieren");
   if (offen.length) p.push(`<span class="pill run">${offen.some((j) => j.status === "laeuft") ? "Claude arbeitet …" : "wartet auf Claude"}</span>`);
   else if (it.jobs[0]?.status === "fehler") p.push(`<span class="pill err">Fehler</span>`);
   return p.join("");
@@ -441,20 +450,37 @@ function neueste(files) {
   const pdf = files.filter((f) => f.name.toLowerCase().endsWith(".pdf"));
   return (pdf.length ? pdf : files).at(-1);
 }
+// Schalter „Notizen“ je Eintrag, gemerkt pro Gerät
+function notizenAn(id) { return store.get("notizen", []).includes(id); }
+function setNotizen(id, an) {
+  const ids = store.get("notizen", []).filter((x) => x !== id);
+  store.set("notizen", an ? [...ids, id] : ids);
+  render();
+}
 function trio(it) {
   const laeuft = (typ) => it.jobs.some((j) => j.typ === typ && (typ !== "personalisieren" || j.owner === S.user)
                                          && (j.status === "offen" || j.status === "laeuft"));
-  const kachel = (label, f, typ) => f
-    ? `<a class="big" href="/files/${f.id}" target="_blank" title="${esc(f.name)}"><span class="ic">${esc((f.name.split(".").pop() || "").toUpperCase().slice(0, 4))}</span>${label}</a>`
-    : `<div class="big leer ${typ && laeuft(typ) ? "laeuft" : ""}"><span class="ic"></span>${label}</div>`;
+  // Schalter „Notizen“: an = die Fassungen öffnen im Leser mit den gemeinsamen Notizen (Stift, Zettel …), aus = reine PDF
+  const mitNotizen = notizenAn(it.id);
+  const kachel = (label, f, typ) => {
+    if (!f) return `<div class="big leer ${typ && laeuft(typ) ? "laeuft" : ""}"><span class="ic"></span>${label}</div>`;
+    const ic = `<span class="ic">${esc((f.name.split(".").pop() || "").toUpperCase().slice(0, 4))}</span>`;
+    const pdf = f.name.toLowerCase().endsWith(".pdf");
+    const n = it.notizen?.[f.rolle];
+    if (mitNotizen && pdf)
+      return `<a class="big" href="/leser/#/wima/${f.id}" target="_blank" title="${esc(f.name)} mit Notizen öffnen">${ic}${label}
+        <span class="n">✎ ${n ? `${esc(n.von)}, ${n.geaendert.slice(8, 10)}.${n.geaendert.slice(5, 7)}.` : "Notizen"}</span></a>`;
+    return `<a class="big" href="/files/${f.id}" target="_blank" title="${esc(f.name)}">${ic}${label}${pdf && n ? `<span class="n" title="Hat Notizen – Schalter „Notizen“ an">✎</span>` : ""}</a>`;
+  };
   const orig = neueste(shared(it, "original"));
   const lang = it.art === "skript";
   const loesung = it.art === "uebung" || it.art === "tutorium";
-  return `<div class="trio" style="--n:${lang || loesung ? 4 : 3}">
+  return `<label class="notizen-schalter" title="Alle Fassungen mit den gemeinsamen Notizen öffnen – mit Stift, Zetteln und verlinkten Definitionen">
+      <input type="checkbox" ${mitNotizen ? "checked" : ""} onchange="setNotizen(${it.id}, this.checked)"><span class="sw"></span>Notizen</label>
+  <div class="trio" style="--n:${lang || loesung ? 3 : 2}">
     ${orig ? kachel("Original", orig) : `<div class="big leer drop" data-item="${it.id}" data-rolle="original" data-owner=""><span class="ic"></span>Original</div>`}
     ${kachel("Verbessert", neueste(shared(it, "verbessert")), "verbessern")}
     ${lang ? kachel("Lang", neueste(shared(it, "lang")), "lang") : ""}
-    ${kachel(`Für ${esc(S.user)}`, neueste(mine(it, "fuer")), "personalisieren")}
     ${loesung ? kachel("Lösung", neueste(shared(it, "loesung")), "loesung") : ""}
   </div>`;
 }
@@ -519,9 +545,10 @@ function details(it) {
   }
   h += fileSection(it, "notiz", S.user, "Deine Notizen", "+ Notizen (Fotos, PDF, .md) hochladen");
   const typen = (it.art === "uebung" || it.art === "tutorium") ? ["aufbereiten", "vergleich", "loesung"] : [];
-  return h + actionBar(it, [...typen, "verbessern", ...(it.art === "skript" ? ["lang"] : []), "personalisieren"]);
+  return h + actionBar(it, [...typen, "verbessern", ...(it.art === "skript" ? ["lang"] : [])]);
 }
 function renderJobs(it) {
+  it = { ...it, jobs: it.jobs.filter((j) => j.typ !== "personalisieren") };  // „Für <Name>“ ist abgeschaltet
   if (!it.jobs.length) return "";
   const icon = { offen: "⏳", laeuft: "⚙️", fertig: "✅", fehler: "⚠️" };
   return `<div class="sec jobs"><h4>Claude-Aufträge</h4>${it.jobs.slice(0, 6).map((j) => `<div class="job">

@@ -56,6 +56,14 @@ CREATE TABLE IF NOT EXISTS worker(nutzer TEXT PRIMARY KEY, last_seen TEXT);
 CREATE TABLE IF NOT EXISTS logins(nutzer TEXT PRIMARY KEY, salt TEXT, hash TEXT);
 CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY, nutzer TEXT NOT NULL, created TEXT);
 CREATE TABLE IF NOT EXISTS wissen(pfad TEXT PRIMARY KEY, text TEXT NOT NULL, geaendert TEXT);
+-- Gemeinsame Notizen des Lesers (leser/) je Eintrag und Fassung: Striche/Zettel als JSON-Datei (daten_id),
+-- die PDF, auf der sie liegen (basis_id), ggf. die vorige Fassung fuer die Verbesserungsansicht (vergleich_id)
+-- und die Wima-Datei, auf deren Stand das alles ist (quelle_id). rev zaehlt jede Aenderung.
+CREATE TABLE IF NOT EXISTS notizen(
+  item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  rolle TEXT NOT NULL, rev INTEGER NOT NULL, daten_id INTEGER, basis_id INTEGER, vergleich_id INTEGER,
+  quelle_id INTEGER, geaendert TEXT, von TEXT,
+  PRIMARY KEY(item_id, rolle));
 """
 
 
