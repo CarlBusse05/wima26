@@ -20,7 +20,9 @@ Cookie "wima" oder "Authorization: Bearer <token>"; lokal zusaetzlich — nur vo
   GET    /api/users                      -> {users:[{name, hat_passwort}]}
   POST   /api/login                      <- {user, passwort}  (Nutzername klein oder gross)
   POST   /api/logout
-  GET    /api/state                      -> {user, users, courses, worker}
+  GET    /api/state                      -> {user, users, courses, worker, einstellungen, plan}
+  PUT    /api/einstellungen              <- {tutorien?: {<kurs_id>: {tag, zeit}}, tutorien_frage?, notizen?: [Nutzer],
+                                            gesehen?: ["<item>:<rolle>"]}  (Datei-Markierung „neu“)
   POST   /api/courses                    <- {name, kuerzel, farbe, semester, owner?}
   PATCH  /api/courses/<id>               <- Teilfelder
   DELETE /api/courses/<id>
@@ -162,7 +164,51 @@ def state(user):
         courses = rows(con.execute("SELECT * FROM courses WHERE owner IS NULL OR owner=? ORDER BY pos, id",
                                    (user,)))
         worker = {r["nutzer"]: r["last_seen"] for r in con.execute("SELECT * FROM worker")}
-    return {"users": USERS, "arten": ARTEN, "courses": courses, "worker": worker, "now": now()}
+    plan = {}
+    if os.path.exists(PLAN):
+        with open(PLAN, encoding="utf-8") as fh:
+            plan = {"reihen": json.load(fh)["reihen"]}
+    einst = einstellungen(user)
+    if "seit" not in einst:  # „neu“ zaehlt erst ab dem ersten Besuch, sonst waere anfangs alles neu
+        einst = einstellungen_setzen(user, {"seit": True})
+    return {"users": USERS, "arten": ARTEN, "courses": courses, "worker": worker, "now": now(),
+            "einstellungen": einst, "plan": plan}
+
+
+def einstellungen(user):
+    with db() as con:
+        row = one(con.execute("SELECT daten FROM einstellungen WHERE nutzer=?", (user,)))
+    return json.loads(row["daten"]) if row else {}
+
+
+def einstellungen_setzen(user, body):
+    """Uebernimmt nur bekannte Schluessel: tutorien (je Kurs Wochentag 1-5 + Uhrzeit), tutorien_frage (Runde der
+    Abfrage), notizen (Nutzerliste), gesehen (["<item>:<rolle>", ...] -> jetzt geoeffnet), seit (erster Besuch)."""
+    daten = einstellungen(user)
+    if body.get("seit") and "seit" not in daten:
+        daten["seit"] = now()
+    if "gesehen" in body:
+        g = dict(daten.get("gesehen", {}))
+        for k in body["gesehen"] or []:
+            if re.fullmatch(r"\d+:[a-z]+", str(k)):
+                g[k] = now()
+        daten["gesehen"] = g
+    if "tutorien_frage" in body:
+        daten["tutorien_frage"] = int(body["tutorien_frage"])
+    if "tutorien" in body:
+        tut = dict(daten.get("tutorien", {}))
+        for kid, t in (body["tutorien"] or {}).items():
+            if not (isinstance(t, dict) and int(t.get("tag", 0)) in range(1, 8)
+                    and re.fullmatch(r"\d{1,2}:\d{2}", str(t.get("zeit", "")))):
+                raise ApiError(400, "Tutorium braucht Wochentag und Uhrzeit")
+            tut[str(int(kid))] = {"tag": int(t["tag"]), "zeit": t["zeit"]}
+        daten["tutorien"] = tut
+    if "notizen" in body:
+        daten["notizen"] = [u for u in USERS if u in (body["notizen"] or [])]
+    with db() as con:
+        con.execute("INSERT INTO einstellungen(nutzer,daten) VALUES(?,?) ON CONFLICT(nutzer) "
+                    "DO UPDATE SET daten=excluded.daten", (user, json.dumps(daten, ensure_ascii=False)))
+    return daten
 
 
 def plan_termine(reihe, plan, bis):
@@ -603,6 +649,8 @@ class Handler(SimpleHTTPRequestHandler):
 
         if method == "GET" and p == "/api/state":
             return self.send_json(dict(state(user), user=user))
+        if method == "PUT" and p == "/api/einstellungen":
+            return self.send_json(einstellungen_setzen(user, self.body_json()))
         if method == "POST" and p == "/api/courses":
             return self.send_json(create_course(self.body_json()))
         if m(r"/api/courses/\d+"):

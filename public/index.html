@@ -15,12 +15,22 @@
   --skript: #2f6fd6; --uebung: #8e44ad; --tutorium: #e84393; --sonstiges: #8d8d93;
 }
 @media (prefers-color-scheme: dark) {
-  :root { --bg: #151517; --panel: #1f1f22; --ink: #ececef; --muted: #9c9ca3; --line: #2f2f34;
-          --soft: #27272b; --accent: #7fb0e0; --shadow: none; }
+  :root:not([data-theme="light"]) { --bg: #151517; --panel: #1f1f22; --ink: #ececef; --muted: #9c9ca3; --line: #2f2f34;
+          --soft: #27272b; --accent: #7fb0e0; --shadow: none; color-scheme: dark; }
 }
+:root[data-theme="dark"] { --bg: #151517; --panel: #1f1f22; --ink: #ececef; --muted: #9c9ca3; --line: #2f2f34;
+          --soft: #27272b; --accent: #7fb0e0; --shadow: none; color-scheme: dark; }
+:root[data-theme="light"] { color-scheme: light; }
+/* Hell/Dunkel unten links */
+#thema { position: fixed; left: 16px; bottom: 16px; z-index: 8; width: 44px; height: 44px; border-radius: 50%; padding: 0;
+         font-size: 20px; line-height: 1; box-shadow: var(--shadow); }
+/* „neu“: Datei seit dem letzten Öffnen neu oder geändert */
+.big { position: relative; }
+.big .neu { position: absolute; top: -7px; right: -6px; font-size: 11px; font-weight: 700; letter-spacing: .03em; color: #fff;
+            background: var(--accent); padding: 1px 7px; border-radius: 999px; box-shadow: 0 0 0 2px var(--panel); }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--ink);
-       font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
+       font: 17px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; border: 1px solid var(--line); background: var(--panel); border-radius: 8px;
          padding: 6px 12px; }
@@ -34,14 +44,14 @@ a { color: var(--accent); }
 
 header { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--bg) 88%, transparent);
          backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
-.bar { max-width: 1040px; margin: 0 auto; padding: 12px 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.bar { max-width: 1840px; margin: 0 auto; padding: 12px 32px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .bar #logout { margin-left: auto; }
 .login { max-width: 340px; margin: 12vh auto 0; display: grid; gap: 10px; }
 .login .err { font-size: 13px; color: var(--err); margin: 0; }
 
-main { max-width: 1040px; margin: 0 auto; padding: 16px 16px 80px; }
+main { max-width: 1840px; margin: 0 auto; padding: 16px 32px 80px; }
 .courses { display: flex; gap: 8px; flex-wrap: wrap; }
-.course { padding: 6px 16px; border-radius: 999px; border: 0; font-weight: 600; color: #fff;
+.course { padding: 6px 18px; border-radius: 999px; border: 0; font-weight: 650; font-size: 17px; color: #fff;
           background: color-mix(in srgb, var(--c) 55%, var(--bg)); }
 .course:hover { background: color-mix(in srgb, var(--c) 80%, var(--bg)); }
 .course.on { background: var(--c); box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--c); }
@@ -55,8 +65,18 @@ body { background: color-mix(in srgb, var(--kurs, var(--bg)) 7%, var(--bg)); }
 .swatch.on { border-color: var(--ink); }
 
 .skript { margin-bottom: 22px; }
-.skript .card { border-left: 5px solid var(--k); }
+.skript .card { border: 2px solid var(--skript); }
+/* Skript so groß wie das Fällige: große PDF-Knöpfe, größerer Titel */
+.skript .card > .top { padding: 12px 16px; }
+.skript .card .t { font-size: 20px; }
+.skript .kind { font-size: 13px; padding: 3px 10px; }
+.skript .trio { gap: 10px; padding-top: 14px; }
+.skript .trio .big { padding: 14px 22px 14px 12px; font-size: 20px; gap: 12px; border-radius: 11px; }
+.skript .trio .big .ic { width: 40px; height: 50px; font-size: 11px; border-radius: 6px; }
 .skript .top { cursor: default; }
+.skript .body { display: flex; flex-wrap: wrap; align-items: flex-end; column-gap: 8px; padding-bottom: 12px; }
+.skript .more { margin: 0 -6px 0 auto; }
+.skript .details, .skript .form { flex-basis: 100%; }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
 .chip { border-radius: 999px; padding: 3px 12px; font-size: 13px; }
 .chip.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
@@ -65,12 +85,12 @@ body { background: color-mix(in srgb, var(--kurs, var(--bg)) 7%, var(--bg)); }
 .timeline::before { content: ""; position: absolute; left: 88px; top: 6px; bottom: 6px; width: 2px; background: var(--line); }
 .month { margin: 22px 0 8px -104px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
 .entry { position: relative; margin-bottom: 10px; }
-.entry .date { position: absolute; left: -104px; width: 76px; text-align: right; top: 13px; font-size: 13px; color: var(--muted); }
+.entry .date { position: absolute; left: -104px; width: 76px; text-align: right; top: 13px; font-size: 15px; color: var(--muted); }
 .entry::before { content: ""; position: absolute; left: -21px; top: 17px; width: 12px; height: 12px; border-radius: 50%;
                  background: var(--panel); border: 3px solid var(--k); }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; }
 .card > .top { display: flex; gap: 10px; align-items: center; padding: 10px 14px; cursor: pointer; flex-wrap: wrap; }
-.kind { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--k);
+.kind { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--k);
         background: color-mix(in srgb, var(--k) 12%, transparent); padding: 2px 8px; border-radius: 6px; }
 .card .t { font-weight: 600; }
 .card .t small { font-weight: 400; color: var(--muted); }
@@ -80,7 +100,8 @@ body { background: color-mix(in srgb, var(--kurs, var(--bg)) 7%, var(--bg)); }
 .pill.run { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); }
 .pill.err { color: var(--err); background: color-mix(in srgb, var(--err) 12%, transparent); }
 .body { border-top: 1px solid var(--line); padding: 0 14px 14px; }
-.trio { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 10px; padding-top: 14px; }
+.trio { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 12px; }
+.trio .big { padding: 8px 16px 8px 8px; font-size: 17px; }
 .big { display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 10px;
        background: var(--bg); color: var(--ink); text-decoration: none; font-weight: 600; min-width: 0; }
 a.big:hover { border-color: var(--k); }
@@ -98,6 +119,7 @@ a.big:hover { border-color: var(--k); }
 @keyframes puls { 50% { background: var(--k); } }
 .big.drop { place-items: initial; min-height: 0; font-size: inherit; }
 .more { display: flex; justify-content: flex-end; gap: 2px; margin: 6px -6px 0 0; }
+.more button { font-size: 15px; }
 .details { border-top: 1px dashed var(--line); margin-top: 8px; padding-top: 12px; }
 .sec { margin-bottom: 14px; }
 .sec h4 { margin: 0 0 6px; font-size: 13px; color: var(--muted); font-weight: 600; }
@@ -133,14 +155,73 @@ a.big:hover { border-color: var(--k); }
 .upmenu { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 0 14px 12px; }
 .upmenu b { font-size: 13px; color: var(--muted); font-weight: 600; margin-right: 4px; }
 .upmenu button { font-size: 13px; padding: 5px 10px; }
-.upbtn { margin-left: auto; font-size: 13px; padding: 4px 10px; }
+.upbtn { margin-left: auto; font-size: 15px; padding: 4px 12px; }
 .upkurs { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
 .upkurs select { max-width: 100%; }
 .prio-up { display: inline-flex; gap: 6px; align-items: center; margin-top: 8px; font-size: 13px; color: var(--muted); cursor: pointer; }
 .korr { margin-top: 10px; padding: 8px 12px; border-left: 3px solid var(--k); background: var(--soft); border-radius: 0 8px 8px 0; font-size: 13px; }
 .korr b { font-size: 12px; color: var(--muted); }
 .korr ul, .korr p { margin: 4px 0; } .korr ul { padding-left: 18px; }
+/* Board: links Tutorien, rechts Übungen, je Zeile ein Blatt */
+.board { display: grid; grid-template-columns: 1fr 1fr; column-gap: 18px; }
+.board h3 { margin: 4px 0 4px; font-size: 17px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.zeile { display: contents; }
+.zelle { padding: 4px 0; }
+.zelle.frueh { padding-bottom: 26px; } .zelle.spaet { padding-top: 26px; }
+.kachel { --z: var(--k); display: grid; grid-template-columns: 48px auto 1fr; grid-template-areas: "nr due dat";
+          align-items: center; column-gap: 14px; row-gap: 6px; padding: 10px 12px 10px 10px; border-radius: 12px; cursor: pointer;
+          background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+.kachel:hover { border-color: color-mix(in srgb, var(--z) 55%, var(--line)); }
+/* Farbe und Status stecken im Nummern-Abzeichen: vorbei = Farbe der Art (hell), jetzt = rot (kräftig), später = grau */
+.kachel.jetzt, .kachel.jetzt:hover { --z: var(--err); border: 3px solid var(--err); padding: 10px 12px 10px 10px;
+  grid-template-columns: 68px auto 1fr; }
+/* das Fällige: Nummern-Abzeichen doppelt so breit, PDF-Knöpfe doppelt so hoch */
+.kachel.jetzt .nr { width: 68px; height: 68px; font-size: 34px; border-radius: 14px; }
+.kachel.jetzt .big { padding: 14px 20px 14px 12px; font-size: 20px; gap: 12px; border-radius: 11px; }
+.kachel.jetzt .big .ic { width: 40px; height: 50px; font-size: 11px; border-radius: 6px; }
+.kachel.jetzt .due { font-size: 20px; }
+/* alles außer dem Fälligen tritt etwas zurück */
+.kachel.vorbei, .kachel.spaeter { box-shadow: none; background: color-mix(in srgb, var(--panel) 75%, transparent); }
+.kachel.vorbei .due { font-weight: 550; color: var(--muted); }
+.kachel.vorbei .nr { background: color-mix(in srgb, var(--z) 9%, transparent); }
+.kachel.vorbei .dat { opacity: .85; }
+.kachel.spaeter { opacity: .75; }
+.kachel.spaeter { --z: #a5a5ab; }
+.kachel.spaeter .dat { opacity: .6; }
+.kachel .nr { grid-area: nr; align-self: center; width: 48px; height: 48px; border-radius: 12px; display: grid; place-items: center;
+              font-size: 26px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums;
+              color: var(--z); background: color-mix(in srgb, var(--z) 13%, transparent); }
+.kachel .due { grid-area: due; font-size: 18px; font-weight: 650; }
+.kachel.jetzt .due { color: var(--err); } .kachel.spaeter .due { color: var(--muted); }
+.kachel .dat { grid-area: dat; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.kachel .big { --k: var(--z); padding: 8px 16px 8px 8px; font-size: 17px; gap: 10px; border-radius: 9px; }
+.kachel .big .ic { width: 28px; height: 34px; font-size: 8px; border-radius: 5px; }
+.leerzelle { min-height: 1px; }
+.sheet { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.35); display: grid; place-items: start center;
+         padding: 8vh 16px 16px; overflow: auto; }
+.sheet > div { width: min(760px, 100%); }
+.sheet .zu { display: block; margin: 0 0 8px auto; background: var(--panel); }
+.menue { position: relative; }
+.menue > button { font-size: 18px; line-height: 1; padding: 6px 10px; }
+.menue .liste { position: absolute; right: 0; top: calc(100% + 6px); background: var(--panel); border: 1px solid var(--line);
+                border-radius: 10px; box-shadow: var(--shadow); padding: 6px; display: grid; min-width: 190px; z-index: 6; }
+.menue .liste a, .menue .liste button { text-align: left; border: 0; background: transparent; padding: 8px 10px; border-radius: 7px;
+                color: var(--ink); text-decoration: none; }
+.menue .liste a:hover, .menue .liste button:hover { background: var(--soft); }
+.bar .notizen-wahl { margin: 0 0 0 auto; font-size: 15px; }
+.bar .notizen-wahl button { font-size: 15px; padding: 2px 12px; }
+.bar .notizen-wahl button.on { background: var(--accent); border-color: var(--accent); }
+.tut { display: grid; gap: 12px; }
+.tut .reihe { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.tut .reihe b { min-width: 120px; }
+.tut p { margin: 0; color: var(--muted); font-size: 14px; }
 @media (max-width: 640px) {
+  .board { column-gap: 8px; }
+  .kachel, .kachel.jetzt { grid-template-columns: 1fr; grid-template-areas: "nr" "due" "dat"; padding: 8px; row-gap: 6px; }
+  .kachel .dat { justify-content: flex-start; }
+  .kachel .nr { font-size: 22px; width: 38px; height: 38px; } .kachel .due { font-size: 13px; }
+  .kachel .dat { grid-template-columns: 1fr; gap: 4px; }
+  .kachel .big { padding: 5px 6px; font-size: 12px; gap: 6px; } .kachel .big .ic { width: 18px; height: 22px; font-size: 7px; }
   .timeline { padding-left: 18px; } .timeline::before { left: 4px; }
   .month { margin-left: -18px; }
   .entry .date { position: static; display: block; text-align: left; width: auto; margin-bottom: 2px; }
@@ -153,13 +234,16 @@ a.big:hover { border-color: var(--k); }
 <body>
 <header id="header" hidden><div class="bar">
   <nav class="courses" id="courses"></nav>
-  <a class="ghost leser-link" href="/leser/" title="Skripte lesen, mit Stift, Notizen und verlinkten Definitionen">📖 Leser</a>
-  <button class="ghost" id="logout" onclick="logout()">Abmelden</button>
+  <div class="notizen-wahl" id="notizen" title="Wessen Notizen im Leser zu sehen sind – mit Stift, Zetteln und verlinkten Definitionen"></div>
+  <div class="menue"><button class="ghost" onclick="S.menue=!S.menue;S.detail=null;render()" title="Einstellungen" aria-label="Einstellungen">☰</button>
+    <div id="menue"></div></div>
 </div></header>
 <main>
   <div id="login"></div>
   <div id="course"></div>
 </main>
+<div id="overlay"></div>
+<button id="thema" onclick="themaWechseln()" title="Hell / Dunkel"></button>
 <input type="file" id="picker" multiple hidden accept="image/*,application/pdf,.md,.tex,.txt">
 
 <script>
@@ -185,6 +269,8 @@ const S = {
   editItem: null, md: {}, more: new Set(),
   prioUpload: new Set(),  // Einträge, deren nächster Lösungsteil priorisiert hochgeladen wird
   upMenu: null,           // Eintrag, dessen Upload-Menü offen ist
+  detail: null,           // Eintrag, dessen Kachel geöffnet ist
+  menue: false, tutForm: false, gescrollt: null,
 };
 
 const $ = (s) => document.querySelector(s);
@@ -231,6 +317,7 @@ async function loadMd(id) {
 async function loadState() {
   S.state = await api("GET", "/api/state");
   S.user = S.state.user;
+  store.set("notizenGlobal", notizSicht());
   if (!S.state.courses.some((c) => c.id === S.course)) S.course = S.state.courses[0]?.id ?? null;
 }
 async function loadItems() {
@@ -265,14 +352,20 @@ async function doLogin() {
   S.login = null; $("#login").innerHTML = "";
   await refresh();
 }
-async function logout() { await api("POST", "/api/logout", {}); await showLogin(); }
+async function logout() { S.menue = false; await api("POST", "/api/logout", {}); $("#overlay").innerHTML = ""; await showLogin(); }
 
 // ---------------------------------------------------------------- Rendern
 function render() {
   if (!S.state) return;
   store.set("course", S.course); store.set("filter", S.filter); store.set("open", [...S.open]);
   $("#header").hidden = false;
-  $("#logout").title = `Angemeldet als ${S.user}`;
+  if (fehlendeTutorien().length) S.tutForm = true;  // jede Person einmal fragen
+  $("#notizen").innerHTML = `Notizen: ${(S.state.users || []).map((u) =>
+    `<button class="${notizSicht().includes(u) ? "on" : ""}" onclick="toggleNotizen('${esc(u)}')">${esc(u)}</button>`).join("")}`;
+  $("#menue").innerHTML = S.menue ? `<div class="liste">
+      <a href="/leser/">📖 Leser</a>
+      <button onclick="S.menue=false;S.tutForm=true;render()">🕑 Tutoriumszeiten</button>
+      <button onclick="logout()">Abmelden</button></div>` : "";
   // Fächer in der Kopfleiste, jedes in seiner Farbe; die Seite ist leicht in der Farbe des gewählten getönt
   $("#courses").innerHTML = S.state.courses.map((c) =>
     `<button class="course ${c.id === S.course ? "on" : ""}" style="--c:${esc(c.farbe || FARBEN[0])}"
@@ -280,35 +373,191 @@ function render() {
   const aktiv = S.state.courses.find((c) => c.id === S.course);
   document.body.style.setProperty("--kurs", aktiv?.farbe || FARBEN[0]);
   $("#course").innerHTML = renderCourse();
+  const d = S.detail && S.items.find((i) => i.id === S.detail);
+  $("#overlay").innerHTML = S.tutForm ? tutFormular()
+    : d ? `<div class="sheet" onclick="if(event.target===this){S.detail=null;render()}"><div>
+        <button class="zu" onclick="S.detail=null;render()">Schließen</button>${detailAnsicht(d)}</div></div>` : "";
   document.querySelectorAll(".drop").forEach(bindDrop);
+  // beim Öffnen eines Kurses zur aktuellen Zeile scrollen
+  if (S.gescrollt !== S.course) {
+    S.gescrollt = S.course;
+    document.querySelector(".kachel.jetzt")?.scrollIntoView({ block: "center" });
+  }
 }
 
 function renderCourse() {
   const c = S.state.courses.find((c) => c.id === S.course);
   if (!c) return `<div class="empty">Noch kein Kurs.</div>`;
-  // Pro Kurs gibt es ein Skript (der neueste Skript-Eintrag); die Timeline zeigt nur Blätter und Termine
+  // Pro Kurs gibt es ein Skript (der neueste Skript-Eintrag), darunter das Board aus Tutorien und Übungen
   const skript = S.items.find((i) => i.art === "skript");
-  if (S.filter === "skript") S.filter = "alle";
-  const termine = S.items.filter((i) => i.art !== "skript");
-  const counts = Object.fromEntries(Object.keys(ARTEN).map((a) => [a, termine.filter((i) => i.art === a).length]));
-  const list = termine.filter((i) => S.filter === "alle" || i.art === S.filter);
   let html = skript ? renderSkript(skript)
     : `<div class="skript"><button class="drop" style="width:100%" onclick="neuesSkript()">+ Skript hochladen</button></div>`;
-  html += `<div class="chips">
-    <button class="chip ${S.filter === "alle" ? "on" : ""}" onclick="S.filter='alle';render()">Alle · ${termine.length}</button>
-    ${Object.entries(ART_PLURAL).filter(([a]) => counts[a]).map(([a, n]) =>
-      `<button class="chip ${S.filter === a ? "on" : ""}" onclick="S.filter='${a}';render()">${n} · ${counts[a]}</button>`).join("")}
-  </div>`;
-  if (!list.length) return html + `<div class="empty">Noch keine Einträge.</div>`;
+  const blaetter = S.items.filter((i) => i.art === "uebung" || i.art === "tutorium");
+  if (blaetter.length) html += renderBoard(blaetter);
+  const sonst = S.items.filter((i) => i.art === "sonstiges");
+  if (sonst.length) html += `<div class="timeline" style="margin-top:28px">${sonst.map(renderEntry).join("")}</div>`;
+  if (!blaetter.length && !sonst.length) html += `<div class="empty">Noch keine Einträge.</div>`;
+  return html;
+}
 
-  html += `<div class="timeline">`;
-  let month = null;
-  for (const it of list) {
-    const m = fmtMonth(it.datum);
-    if (m !== month) { html += `<div class="month">${m}</div>`; month = m; }
-    html += renderEntry(it);
+// ---------------------------------------------------------------- Board
+const TAGE = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+const kurs = () => S.state.courses.find((c) => c.id === S.course);
+const reihe = (k, art) => (S.state.plan?.reihen || []).find((r) => r.kurs === k?.kuerzel && r.art === art);
+const tutorienEinst = () => S.state.einstellungen?.tutorien || {};
+// Kurse mit Tutorium (laut Stundenplan): dort braucht jede Person ihre eigene Tutoriumszeit
+const tutKurse = () => S.state.courses.filter((c) => reihe(c, "tutorium"));
+// Runde der Abfrage: erhöhen, um alle noch einmal zu fragen (03.11.: Runde 2)
+const TUT_FRAGE = 2;
+const fehlendeTutorien = () => (S.state.einstellungen?.tutorien_frage || 0) < TUT_FRAGE ? tutKurse()
+  : tutKurse().filter((c) => !tutorienEinst()[c.id]);
+
+const plusTage = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+const mitZeit = (d, zeit) => { const [h, m] = zeit.split(":").map(Number); const x = new Date(d); x.setHours(h, m, 0, 0); return x; };
+// „Abgabe bis Mi 28.10., 15:00“ / „Tutorium Do 05.11., 14:15“ -> Datum (Jahr aus dem Erscheinungsdatum)
+function ausTitel(it) {
+  const m = (it.titel || "").match(/(\d{1,2})\.(\d{1,2})\.?,?\s*(?:(\d{1,2})[:.](\d{2}))?/);
+  if (!m || !it.datum) return null;
+  const start = new Date(it.datum + "T00:00");
+  let jahr = start.getFullYear();
+  if (+m[2] < start.getMonth() + 1 - 6) jahr++;  // Dezember-Blatt mit Abgabe im Januar
+  return new Date(jahr, m[2] - 1, m[1], m[3] ? +m[3] : 23, m[4] ? +m[4] : 59);
+}
+// Fälligkeit: Übung = Abgabe; Tutorium = die eigene Tutoriumszeit in der Woche, in der das Blatt besprochen wird
+function faellig(it) {
+  if (!it.datum) return null;
+  const start = new Date(it.datum + "T00:00");
+  const t = it.art === "tutorium" && tutorienEinst()[it.course_id ?? S.course];
+  if (t) {
+    const woche = reihe(kurs(), "tutorium")?.besprechung_woche ?? 0;
+    const montag = plusTage(start, -((start.getDay() + 6) % 7) + 7 * woche);
+    let d = mitZeit(plusTage(montag, t.tag - 1), t.zeit);
+    if (d <= start) d = plusTage(d, 7);
+    return d;
   }
-  return html + `</div>`;
+  return ausTitel(it) || mitZeit(plusTage(start, 7), "23:59");
+}
+const fmtDue = (d) => d ? `${TAGE[d.getDay()]} ${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}. · ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}` : "";
+
+function renderBoard(blaetter) {
+  const jetzt = new Date();
+  const due = new Map(blaetter.map((it) => [it.id, faellig(it)]));
+  // je Spalte: vorbei = in der Farbe der Art, das nächste fällige = rot, alles danach = grau
+  const zustand = new Map();
+  for (const art of ["tutorium", "uebung"]) {
+    const liste = blaetter.filter((i) => i.art === art).sort((a, b) => (due.get(a.id) ?? 0) - (due.get(b.id) ?? 0));
+    let naechstes = true;
+    for (const it of liste) {
+      const d = due.get(it.id);
+      if (d && d < jetzt) zustand.set(it.id, "vorbei");
+      else if (naechstes) { zustand.set(it.id, "jetzt"); naechstes = false; }
+      else zustand.set(it.id, "spaeter");
+    }
+  }
+  // Zeilen = Blattnummer, neueste oben; in jeder Zeile steht das früher Fällige etwas höher
+  const zeilen = new Map();
+  for (const it of blaetter) {
+    const nr = String(it.nummer ?? "?");
+    zeilen.set(nr, { ...zeilen.get(nr), [it.art]: it });
+  }
+  const sortiert = [...zeilen.entries()].sort(([a, x], [b, y]) => {
+    const da = due.get((x.uebung || x.tutorium).id) ?? 0, db = due.get((y.uebung || y.tutorium).id) ?? 0;
+    return db - da || (parseInt(b) || 0) - (parseInt(a) || 0);  // neueste oben
+  });
+  // genau zwei Zustände je Kurs: Mehrheit der Zeilen, in denen beides fällig ist
+  let tutFrueher = 0;
+  for (const [, z] of sortiert) if (z.tutorium && z.uebung)
+    tutFrueher += due.get(z.tutorium.id) < due.get(z.uebung.id) ? 1 : -1;
+  const vorn = tutFrueher > 0 ? "tutorium" : "uebung";
+  const zelle = (it, art) => `<div class="zelle ${art === vorn ? "frueh" : "spaet"}">${it ? kachel(it, zustand.get(it.id), due.get(it.id)) : `<div class="leerzelle"></div>`}</div>`;
+  return `<div class="board"><h3>Tutorium</h3><h3>Übung</h3>
+    ${sortiert.map(([, z]) => `<div class="zeile">${zelle(z.tutorium, "tutorium")}${zelle(z.uebung, "uebung")}</div>`).join("")}
+  </div>`;
+}
+function kachel(it, zustand, d) {
+  return `<div class="kachel ${zustand}" style="--k:var(--${it.art})" onclick="if(!event.target.closest('a'))S.detail=${it.id},render()">
+    <div class="nr">${esc(it.nummer ?? "")}</div>
+    <div class="due">${fmtDue(d)}</div>
+    <div class="dat">${pdfKacheln(it)}</div>
+  </div>`;
+}
+// Original / Verbessert / Lösung als PDF-Kacheln; fehlende grau (pulsierend, solange Claude daran arbeitet)
+function pdfKacheln(it) {
+  const laeuft = (typ) => it.jobs.some((j) => j.typ === typ && (j.status === "offen" || j.status === "laeuft"));
+  const k = (label, f, typ) => {
+    if (!f) return `<div class="big leer ${typ && laeuft(typ) ? "laeuft" : ""}"><span class="ic"></span>${label}</div>`;
+    const n = it.notizen?.[f.rolle];
+    return `<a class="big" href="${dateiLink(f)}" target="_blank" title="${esc(f.name)}" onclick="gesehen(${it.id},'${f.rolle}')"><span class="ic">${esc((f.name.split(".").pop() || "").toUpperCase().slice(0, 4))}</span>${label}${n ? `<span class="n">✎</span>` : ""}${neuMarke(it, f)}</a>`;
+  };
+  return k("Original", neueste(shared(it, "original")))
+    + k("Verbessert", neueste(shared(it, "verbessert")), "verbessern")
+    + k("Lösung", neueste(shared(it, "loesung").filter((f) => !f.name.endsWith(".md"))), "loesung");
+}
+// Beim Klick auf eine Kachel: nur Hochladen, Lösungsteile und „Mehr“, die PDFs sieht man schon auf dem Board
+function detailAnsicht(it) {
+  const more = S.more.has(it.id);
+  return `<div class="card" style="--k:var(--${it.art})">
+    <div class="top" style="cursor:default"><span class="kind">${ARTEN[it.art]}</span>
+      <span class="t">${ARTEN[it.art]} ${esc(it.nummer ?? "")} <small>· ${fmtDue(faellig(it))}</small></span>
+      <span class="sum">${summary(it)}</span></div>
+    <div class="upmenu"><b>Hochladen:</b>${upZiele(it).map(([z, label]) => `<button onclick="waehleUpload(${it.id},'${z}')">${label}</button>`).join("")}</div>
+    <div class="body">${loesungsTeile(it)}<div class="more">
+      <button class="ghost" onclick="S.more.${more ? "delete" : "add"}(${it.id});render()">${more ? "Weniger" : "Mehr"}</button>
+      <button class="ghost" onclick="S.editItem=${it.id};render()">Bearbeiten</button></div>
+      ${S.editItem === it.id ? itemForm(it, `saveItem(${it.id})`) : ""}
+      ${more ? `<div class="details">${details(it)}${renderJobs(it)}</div>` : ""}</div></div>`;
+}
+// PDF mit gewählten Notizen im Leser öffnen, sonst die Datei selbst
+const dateiLink = (f) => notizSicht().length && f.name.toLowerCase().endsWith(".pdf") ? `/leser/#/wima/${f.id}` : `/files/${f.id}`;
+
+// ---------------------------------------------------------------- Hell / Dunkel (pro Gerät)
+function istDunkel() {
+  const t = document.documentElement.dataset.theme;
+  return t ? t === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+}
+function themaZeigen() { $("#thema").textContent = istDunkel() ? "☀️" : "🌙"; $("#thema").title = istDunkel() ? "Hell" : "Dunkel"; }
+function themaWechseln() {
+  const neu = istDunkel() ? "light" : "dark";
+  document.documentElement.dataset.theme = neu;
+  store.set("thema", neu);
+  themaZeigen();
+}
+{ const t = store.get("thema", null); if (t) document.documentElement.dataset.theme = t; themaZeigen(); }
+
+// ---------------------------------------------------------------- „neu“
+// Neu = Datei entstand nach dem letzten Öffnen dieser Fassung (frühestens ab dem ersten Besuch, siehe Server „seit“)
+function istNeu(it, f) {
+  const e = S.state.einstellungen || {};
+  const zuletzt = [e.seit, e.gesehen?.[`${it.id}:${f.rolle}`]].filter(Boolean).sort().at(-1) || "";
+  return f.created > zuletzt;
+}
+const neuMarke = (it, f) => istNeu(it, f) ? `<span class="neu">neu</span>` : "";
+function gesehen(itemId, rolle) {
+  const k = `${itemId}:${rolle}`;
+  S.state.einstellungen = { ...S.state.einstellungen, gesehen: { ...(S.state.einstellungen.gesehen || {}), [k]: S.state.now } };
+  fetch("/api/einstellungen", { method: "PUT", headers: { "Content-Type": "application/json" }, keepalive: true,
+    body: JSON.stringify({ gesehen: [k] }) }).then((r) => r.ok && r.json()).then((e) => { if (e) S.state.einstellungen = e; });
+  setTimeout(render, 0);
+}
+
+// ---------------------------------------------------------------- Tutoriumszeiten
+function tutFormular() {
+  const pflicht = fehlendeTutorien().length > 0;
+  return `<div class="sheet"><div><form class="panel tut" onsubmit="event.preventDefault();tutSpeichern()">
+    <h3 style="margin:0">Wann ist dein Tutorium?</h3>
+    <p>Danach richten sich die Daten der Tutoriumsblätter auf deinem Board. Ändern kannst du das später im Menü ☰.</p>
+    ${tutKurse().map((c) => { const t = tutorienEinst()[c.id] || {}; return `<div class="reihe"><b>${esc(c.name)}</b>
+      <select id="tut_tag_${c.id}" required><option value="">Wochentag</option>${[1, 2, 3, 4, 5].map((n) =>
+        `<option value="${n}" ${t.tag === n ? "selected" : ""}>${["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag"][n - 1]}</option>`).join("")}</select>
+      <input type="time" id="tut_zeit_${c.id}" required value="${esc(t.zeit || "")}" step="900"></div>`; }).join("")}
+    <div class="reihe"><button class="primary" type="submit">Speichern</button>
+      ${pflicht ? "" : `<button class="ghost" type="button" onclick="S.tutForm=false;render()">Abbrechen</button>`}</div>
+  </form></div></div>`;
+}
+async function tutSpeichern() {
+  const tutorien = Object.fromEntries(tutKurse().map((c) => [c.id, { tag: +$(`#tut_tag_${c.id}`).value, zeit: $(`#tut_zeit_${c.id}`).value }]));
+  S.state.einstellungen = await api("PUT", "/api/einstellungen", { tutorien, tutorien_frage: TUT_FRAGE });
+  S.tutForm = false; render();
 }
 
 function itemForm(it, onsave) {
@@ -361,7 +610,7 @@ function card(it, { fest = false, titel = null } = {}) {
   const title = titel ?? `${ARTEN[it.art]}${it.nummer ? " " + esc(it.nummer) : ""}${kurz ? ` <small>· ${esc(kurz)}</small>` : ""}`;
   let html = `<div class="card">
     <div class="top" ${fest ? "" : `onclick="toggle(${it.id})"`}>
-      <span class="kind">${fest ? "Skript" : ARTEN[it.art]}</span>
+      <span class="kind">${ARTEN[it.art] === "Vorlesung" ? "Skript" : ARTEN[it.art]}</span>
       <span class="t">${title}</span>
       <span class="sum">${summary(it)}</span>
       <button class="upbtn" onclick="event.stopPropagation();S.upMenu=S.upMenu===${it.id}?null:${it.id};render()">Hochladen</button>
@@ -424,23 +673,23 @@ function neueste(files) {
   const pdf = files.filter((f) => f.name.toLowerCase().endsWith(".pdf"));
   return (pdf.length ? pdf : files).at(-1);
 }
-// „Notizen: Carl Emil“ je Eintrag: wessen Notizen im Leser zu sehen sind, gemerkt pro Gerät
-// (der Leser liest dieselbe Auswahl aus localStorage; ohne Auswahl öffnen die Kacheln die reine PDF)
-function sicht(id) { return store.get("notizenSicht", {})[id] ?? []; }
-function toggleSicht(id, user) {
-  const alle = store.get("notizenSicht", {});
-  const v = alle[id] ?? [];
-  alle[id] = v.includes(user) ? v.filter((u) => u !== user) : [...v, user];
-  store.set("notizenSicht", alle);
+// „Notizen: Carl Emil …“ in der Kopfleiste: wessen Notizen im Leser zu sehen sind, eine Einstellung pro Nutzer (Server)
+function notizSicht() {
+  const e = S.state?.einstellungen?.notizen;
+  if (e) return e;
+  // früher je Eintrag und Gerät gemerkt: alle damals gewählten Nutzer übernehmen
+  const alt = Object.values(store.get("notizenSicht", {})).flat();
+  return (S.state?.users || []).filter((u) => alt.includes(u));
+}
+async function toggleNotizen(user) {
+  const v = notizSicht();
+  const notizen = v.includes(user) ? v.filter((u) => u !== user) : [...v, user];
+  S.state.einstellungen = { ...S.state.einstellungen, notizen };
   render();
+  store.set("notizenGlobal", notizen);  // der Leser in einem anderen Tab zieht sofort nach
+  S.state.einstellungen = await api("PUT", "/api/einstellungen", { notizen });
 }
-// früherer Schalter „Notizen“ (eine gemeinsame Fassung): eingeschaltete Einträge zeigen alle
-if (localStorage.getItem("wima.notizen") !== null) {
-  const alle = store.get("notizenSicht", {});
-  for (const id of store.get("notizen", [])) alle[id] ??= ["Carl", "Emil"];
-  store.set("notizenSicht", alle);
-  localStorage.removeItem("wima.notizen");
-}
+const sicht = () => notizSicht();
 function trio(it) {
   const laeuft = (typ) => it.jobs.some((j) => j.typ === typ && (typ !== "personalisieren" || j.owner === S.user)
                                          && (j.status === "offen" || j.status === "laeuft"));
@@ -453,16 +702,14 @@ function trio(it) {
     const pdf = f.name.toLowerCase().endsWith(".pdf");
     const n = it.notizen?.[f.rolle];
     if (mitNotizen && pdf)
-      return `<a class="big" href="/leser/#/wima/${f.id}" target="_blank" title="${esc(f.name)} mit Notizen öffnen">${ic}${label}
-        <span class="n">✎${n ? ` ${n.geaendert.slice(8, 10)}.${n.geaendert.slice(5, 7)}.` : ""}</span></a>`;
-    return `<a class="big" href="/files/${f.id}" target="_blank" title="${esc(f.name)}">${ic}${label}${pdf && n ? `<span class="n" title="Hat Notizen – oben bei „Notizen“ Nutzer wählen">✎</span>` : ""}</a>`;
+      return `<a class="big" href="/leser/#/wima/${f.id}" target="_blank" title="${esc(f.name)} mit Notizen öffnen" onclick="gesehen(${it.id},'${f.rolle}')">${ic}${label}
+        <span class="n">✎${n ? ` ${n.geaendert.slice(8, 10)}.${n.geaendert.slice(5, 7)}.` : ""}</span>${neuMarke(it, f)}</a>`;
+    return `<a class="big" href="/files/${f.id}" target="_blank" title="${esc(f.name)}" onclick="gesehen(${it.id},'${f.rolle}')">${neuMarke(it, f)}${ic}${label}${pdf && n ? `<span class="n" title="Hat Notizen – oben in der Kopfleiste bei „Notizen“ Nutzer wählen">✎</span>` : ""}</a>`;
   };
   const orig = neueste(shared(it, "original"));
   const lang = it.art === "skript";
   const loesung = it.art === "uebung" || it.art === "tutorium";
-  return `<div class="notizen-wahl" title="Wessen Notizen im Leser zu sehen sind – mit Stift, Zetteln und verlinkten Definitionen">Notizen:
-      ${(S.state.users || []).map((u) => `<button class="${gewaehlt.includes(u) ? "on" : ""}" onclick="toggleSicht(${it.id},'${esc(u)}')">${esc(u)}</button>`).join("")}</div>
-  <div class="trio" style="--n:${lang || loesung ? 3 : 2}">
+  return `<div class="trio" style="--n:${lang || loesung ? 3 : 2}">
     ${orig ? kachel("Original", orig) : `<div class="big leer drop" data-item="${it.id}" data-rolle="original" data-owner=""><span class="ic"></span>Original</div>`}
     ${kachel("Verbessert", neueste(shared(it, "verbessert")), "verbessern")}
     ${lang ? kachel("Lang", neueste(shared(it, "lang")), "lang") : ""}
@@ -534,7 +781,7 @@ function renderJobs(it) {
 }
 
 // ---------------------------------------------------------------- Aktionen
-async function selectCourse(id) { S.course = id; S.filter = "alle"; S.editItem = null; await loadItems(); render(); }
+async function selectCourse(id) { S.course = id; S.filter = "alle"; S.editItem = null; S.detail = null; await loadItems(); render(); }
 function toggle(id) { S.open.has(id) ? S.open.delete(id) : S.open.add(id); render(); }
 async function neuesSkript() {
   const it = await api("POST", "/api/items", { course_id: S.course, art: "skript", nummer: "1", titel: "Skript",
@@ -585,6 +832,8 @@ async function upload(files, { item, rolle, owner }) {
   if (teil && ok) await api("POST", "/api/jobs", { item_id: +item, typ: "loesung" });
   await refresh();
 }
+document.addEventListener("click", (e) => { if (S.menue && !e.target.closest(".menue")) { S.menue = false; render(); } });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && (S.detail || S.menue)) { S.detail = null; S.menue = false; render(); } });
 let dropTarget = null;
 $("#picker").addEventListener("change", (e) => { if (dropTarget) upload([...e.target.files], dropTarget); e.target.value = ""; });
 function bindDrop(el) {

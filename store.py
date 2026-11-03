@@ -56,6 +56,8 @@ CREATE TABLE IF NOT EXISTS worker(nutzer TEXT PRIMARY KEY, last_seen TEXT);
 CREATE TABLE IF NOT EXISTS logins(nutzer TEXT PRIMARY KEY, salt TEXT, hash TEXT);
 CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY, nutzer TEXT NOT NULL, created TEXT);
 CREATE TABLE IF NOT EXISTS wissen(pfad TEXT PRIMARY KEY, text TEXT NOT NULL, geaendert TEXT);
+-- Persoenliche Einstellungen als JSON: {tutorien: {<kurs_id>: {tag: 1-5, zeit: "14:15"}}, notizen: [Nutzer]}
+CREATE TABLE IF NOT EXISTS einstellungen(nutzer TEXT PRIMARY KEY, daten TEXT NOT NULL);
 -- Gemeinsame Notizen des Lesers (leser/) je Eintrag und Fassung: Striche/Zettel als JSON-Datei (daten_id),
 -- die PDF, auf der sie liegen (basis_id), ggf. die vorige Fassung fuer die Verbesserungsansicht (vergleich_id)
 -- und die Wima-Datei, auf deren Stand das alles ist (quelle_id). rev zaehlt jede Aenderung.

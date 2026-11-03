@@ -141,28 +141,42 @@ const stand = async (item: number, rolle: string) =>
 
 // ---------- wessen Notizen zu sehen sind ----------
 
-let wer: Promise<{ user: string; users: string[] }> | null = null;
-/** Angemeldeter Wima-Nutzer und alle Nutzer. */
+type Nutzer = { user: string; users: string[]; notizen: string[] | null };
+let wer: Promise<Nutzer> | null = null;
+/** Angemeldeter Wima-Nutzer, alle Nutzer und seine Notizen-Auswahl (eine Einstellung pro Nutzer, in Wima oben). */
 export const wimaNutzer = () =>
-  (wer ??= getJson<{ user: string; users: string[] }>("/api/state").then((s) => ({ user: s.user, users: s.users })));
+  (wer ??= getJson<{ user: string; users: string[]; einstellungen?: { notizen?: string[] } }>("/api/state").then((s) => {
+    const notizen = s.einstellungen?.notizen ?? null;
+    if (notizen) merken(notizen);
+    return { user: s.user, users: s.users, notizen };
+  }));
 
-// Gleiche Adresse wie Wima, also derselbe localStorage: { <Eintrag>: ["Carl", …] }
-const SICHT = "wima.notizenSicht";
-const sichtAlle = (): Record<string, string[]> => {
+// Zwischenspeicher der Auswahl (gilt für alle Einträge); maßgeblich ist der Server
+const SICHT = "wima.notizenGlobal";
+const merken = (users: string[]) => {
   try {
-    return JSON.parse(localStorage.getItem(SICHT) ?? "{}") ?? {};
-  } catch {
-    return {};
-  }
-};
-export const sichtbar = (item: number): string[] => sichtAlle()[item] ?? [];
-export function setSichtbar(item: number, users: string[]) {
-  try {
-    localStorage.setItem(SICHT, JSON.stringify({ ...sichtAlle(), [item]: users }));
+    localStorage.setItem(SICHT, JSON.stringify(users));
   } catch {
     /* privates Fenster o. Ä. */
   }
-  window.dispatchEvent(new CustomEvent("wima-sicht", { detail: item }));
+  window.dispatchEvent(new CustomEvent("wima-sicht"));
+};
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const sichtbar = (_item?: number): string[] => {
+  try {
+    return JSON.parse(localStorage.getItem(SICHT) ?? "[]") ?? [];
+  } catch {
+    return [];
+  }
+};
+export function setSichtbar(_item: number, users: string[]) {
+  merken(users);
+  fetch("/api/einstellungen", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
+    body: JSON.stringify({ notizen: users }),
+  }).catch(() => {});
 }
 /** Meldet Änderungen der Auswahl – auch aus dem Wima-Tab. */
 export function onSicht(item: number, cb: (users: string[]) => void): () => void {
