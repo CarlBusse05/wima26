@@ -8,6 +8,14 @@ Grundlage ist die verbesserte Fassung: Alle Korrekturen und Ergänzungen von dor
 hinein. Du schreibst aber **neues Lernmaterial**, keine Kopie mit Zusätzen. Die Reihenfolge
 der Vorlesung bleibt, jede Definition und jeder Satz verweist auf die Nummer im Skript.
 
+**Kästen heißen wie im Skript.** Jeder Definitions- und Satzkasten trägt als Titel genau die
+Bezeichnung, die das Original an dieser Stelle benutzt („Definition (Gruppe)“, „Feststellung“,
+„Bemerkung“, „Hinweis“, „Behauptung“, „Beispiel 2“ …), nicht ein pauschales „Satz“. Rechts steht
+die Fundstelle: `\begin{satz}[Feststellung]{Skript S.~11, (12)}`, also Seite, Gleichungsnummer
+und bei Aufzählungen den Punkt. Hat das Skript Satznummern, gehört die Nummer in die Fundstelle
+(„Skript Satz 2.6“). Das LinA-Skript hat **keine** Satznummern, dort Seite und Gleichung.
+Gibt es eine `vorherige_version` mit solchen Titeln, übernimm sie für unveränderte Stellen.
+
 Eingaben:
 - `input/verbessert/`: die verbesserte Fassung (`.tex` und `.pdf`), deine Hauptquelle
 - `input/skript/`: das Original, zum Nachschlagen der Nummern

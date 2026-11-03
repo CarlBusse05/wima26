@@ -76,7 +76,7 @@ PUBLIC = os.path.join(DIR, "public")
 PLAN = os.path.join(DIR, "stundenplan.json")  # Vorausplanung, siehe vorplanen()
 ONLINE = bool(os.environ.get("VERCEL"))
 
-USERS = [u.strip() for u in os.environ.get("WIMA_USERS", "Carl,Emil").split(",") if u.strip()]
+USERS = [u.strip() for u in os.environ.get("WIMA_USERS", "Carl,Emil,Theo,Marie").split(",") if u.strip()]
 ARTEN = ["skript", "uebung", "tutorium", "sonstiges"]
 HAUPT = os.environ.get("WIMA_HAUPT") or USERS[0]  # erledigt die gemeinsamen Jobs
 ROLLEN = ["original", "musterloesung", "verbessert", "lang", "fuer", "foto", "notiz",

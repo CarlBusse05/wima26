@@ -525,7 +525,7 @@ function renderJobs(it) {
   return `<div class="sec jobs"><h4>Claude-Aufträge</h4>${it.jobs.slice(0, 6).map((j) => `<div class="job">
     <span>${icon[j.status]}</span>
     <div style="flex:1"><b>${JOBS[j.typ]}</b> · ${esc(j.owner)} · ${esc((j.created || "").slice(5, 16).replace("T", " "))}
-      ${j.status === "offen" ? `<div class="msg">${GEMEINSAM.has(j.typ) ? "Wartet auf einen laufenden Worker (Carl oder Emil) …" : `Wartet auf ${esc(j.owner)}s Worker …`}</div>` : ""}
+      ${j.status === "offen" ? `<div class="msg">${GEMEINSAM.has(j.typ) ? "Wartet auf einen laufenden Worker …" : `Wartet auf ${esc(j.owner)}s Worker …`}</div>` : ""}
       ${j.status === "laeuft" ? `<div class="msg">Claude arbeitet seit ${esc((j.started || "").slice(11, 16))} …</div>` : ""}
       ${j.ergebnis ? `<div class="msg">${esc(j.ergebnis)}</div>` : ""}</div>
     ${j.status === "fehler" || j.status === "laeuft" ? `<button class="ghost" onclick="retryJob(${j.id})">Neu starten</button>` : ""}

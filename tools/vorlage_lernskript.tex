@@ -5,8 +5,9 @@
 %   \kapitel{Titel}{Lernziele als \item-Liste}     Kapitel-Startseite (danach Begriffskarte als TikZ)
 %   \einheit{Titel}                                  neue Lerneinheit, beginnt auf neuer Seite
 %   \begin{worum} ... \end{worum}                    "Worum geht's?" am Anfang jeder Einheit
-%   \begin{definition}[Name, Skript Def. 2.4]        blau
-%   \begin{satz}[Name, Skript Satz 2.6]              lila
+%   \begin{definition}[Bezeichnung wie im Skript]{Fundstelle}   blau, z. B. [Definition (Gruppe)]{Skript S.~5, (5)}
+%   \begin{satz}[Bezeichnung wie im Skript]{Fundstelle}         lila, z. B. [Feststellung]{Skript S.~11}
+%                                                     ohne [..] steht "Definition" bzw. "Satz"; {..} ist Pflicht
 %   \begin{beispiel}[Titel]                          gruen   (auch: gegenbeispiel, rot)
 %   \begin{stolperfalle}                             orange
 %   \begin{kurzcheck} \item ... \end{kurzcheck}      grau, nummerierte Fragen; Loesungen am Kapitelende
@@ -70,10 +71,12 @@
 % ---------------------------------------------------------------- Kaesten
 \tcbset{lern/.style={enhanced, breakable, boxrule=0.6pt, arc=2mm, left=8pt, right=8pt, top=6pt,
   bottom=6pt, fonttitle=\sffamily\bfseries, before skip=0.9em, after skip=0.9em}}
-\newtcolorbox{definition}[1][]{lern, colback=defblau!6, colframe=defblau, colbacktitle=defblau,
-  title={Definition\if\relax\detokenize{#1}\relax\else{} · #1\fi}}
-\newtcolorbox{satz}[1][]{lern, colback=satzlila!6, colframe=satzlila, colbacktitle=satzlila,
-  title={Satz\if\relax\detokenize{#1}\relax\else{} · #1\fi}}
+% Titel = Bezeichnung genau wie im Skript, rechts die Fundstelle (Seite, Gleichung, Punkt)
+\newcommand{\boxtitel}[2]{\raggedright #1\unskip\nobreak\hfil\penalty50\hskip1.5em\hbox{}\nobreak\hfill\textnormal{\small #2}\parfillskip=0pt\par}
+\newtcolorbox{definition}[2][Definition]{lern, colback=defblau!6, colframe=defblau, colbacktitle=defblau,
+  title={\boxtitel{#1}{#2}}}
+\newtcolorbox{satz}[2][Satz]{lern, colback=satzlila!6, colframe=satzlila, colbacktitle=satzlila,
+  title={\boxtitel{#1}{#2}}}
 \newtcolorbox{beispiel}[1][]{lern, colback=bspgruen!6, colframe=bspgruen, colbacktitle=bspgruen,
   title={Beispiel\if\relax\detokenize{#1}\relax\else{}: #1\fi}}
 \newtcolorbox{gegenbeispiel}[1][]{lern, colback=gegenrot!5, colframe=gegenrot, colbacktitle=gegenrot,
