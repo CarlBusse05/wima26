@@ -70,9 +70,8 @@ body { background: color-mix(in srgb, var(--kurs, var(--bg)) 7%, var(--bg)); }
 .skript .card > .top { padding: 12px 16px; }
 .skript .card .t { font-size: 20px; }
 .skript .kind { font-size: 13px; padding: 3px 10px; }
-.skript .trio { gap: 10px; padding-top: 14px; }
-.skript .trio .big { padding: 14px 22px 14px 12px; font-size: 20px; gap: 12px; border-radius: 11px; }
-.skript .trio .big .ic { width: 40px; height: 50px; font-size: 11px; border-radius: 6px; }
+.skript .trio { gap: 8px; padding-top: 12px; flex-wrap: nowrap; }
+
 .skript .top { cursor: default; }
 .skript .body { display: flex; flex-wrap: wrap; align-items: flex-end; column-gap: 8px; padding-bottom: 12px; }
 .skript .more { margin: 0 -6px 0 auto; }
@@ -173,13 +172,10 @@ a.big:hover { border-color: var(--k); }
           background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
 .kachel:hover { border-color: color-mix(in srgb, var(--z) 55%, var(--line)); }
 /* Farbe und Status stecken im Nummern-Abzeichen: vorbei = Farbe der Art (hell), jetzt = rot (kräftig), später = grau */
-.kachel.jetzt, .kachel.jetzt:hover { --z: var(--err); border: 3px solid var(--err); padding: 10px 12px 10px 10px;
-  grid-template-columns: 68px auto 1fr; }
+.kachel.jetzt, .kachel.jetzt:hover { --z: var(--err); border: 3px solid var(--err); padding: 8px 10px 8px 8px; }
 /* das Fällige: Nummern-Abzeichen doppelt so breit, PDF-Knöpfe doppelt so hoch */
-.kachel.jetzt .nr { width: 68px; height: 68px; font-size: 34px; border-radius: 14px; }
-.kachel.jetzt .big { padding: 14px 20px 14px 12px; font-size: 20px; gap: 12px; border-radius: 11px; }
-.kachel.jetzt .big .ic { width: 40px; height: 50px; font-size: 11px; border-radius: 6px; }
-.kachel.jetzt .due { font-size: 20px; }
+
+
 /* alles außer dem Fälligen tritt etwas zurück */
 .kachel.vorbei, .kachel.spaeter { box-shadow: none; background: color-mix(in srgb, var(--panel) 75%, transparent); }
 .kachel.vorbei .due { font-weight: 550; color: var(--muted); }
@@ -193,9 +189,11 @@ a.big:hover { border-color: var(--k); }
               color: var(--z); background: color-mix(in srgb, var(--z) 13%, transparent); }
 .kachel .due { grid-area: due; font-size: 18px; font-weight: 650; }
 .kachel.jetzt .due { color: var(--err); } .kachel.spaeter .due { color: var(--muted); }
-.kachel .dat { grid-area: dat; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
-.kachel .big { --k: var(--z); padding: 8px 16px 8px 8px; font-size: 17px; gap: 10px; border-radius: 9px; }
-.kachel .big .ic { width: 28px; height: 34px; font-size: 8px; border-radius: 5px; }
+.kachel .dat { grid-area: dat; display: flex; flex-wrap: nowrap; gap: 8px; justify-content: flex-end; min-width: 0; }
+.kachel .big, .skript .trio .big { padding: 9px 16px 9px 9px; font-size: 18px; gap: 10px; border-radius: 10px;
+  flex: 0 1 auto; white-space: nowrap; }
+.kachel .big { --k: var(--z); }
+.kachel .big .ic, .skript .trio .big .ic { width: 32px; height: 40px; font-size: 9px; border-radius: 5px; }
 .leerzelle { min-height: 1px; }
 .sheet { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.35); display: grid; place-items: start center;
          padding: 8vh 16px 16px; overflow: auto; }
@@ -215,10 +213,21 @@ a.big:hover { border-color: var(--k); }
 .tut .reihe { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .tut .reihe b { min-width: 120px; }
 .tut p { margin: 0; color: var(--muted); font-size: 14px; }
+/* Laptop: Knöpfe kleiner, damit Datum und drei PDFs in eine Zeile passen */
+@media (max-width: 1500px) {
+  .kachel .big, .skript .trio .big { padding: 7px 12px 7px 7px; font-size: 16px; gap: 8px; }
+  .kachel .big .ic, .skript .trio .big .ic { width: 26px; height: 32px; font-size: 8px; }
+  .kachel .due { font-size: 16px; } .kachel { column-gap: 10px; }
+}
+@media (max-width: 1150px) {
+  .kachel .big { padding: 6px 9px 6px 6px; font-size: 14px; gap: 6px; }
+  .kachel .big .ic { width: 20px; height: 25px; font-size: 7px; }
+}
 @media (max-width: 640px) {
   .board { column-gap: 8px; }
   .kachel, .kachel.jetzt { grid-template-columns: 1fr; grid-template-areas: "nr" "due" "dat"; padding: 8px; row-gap: 6px; }
-  .kachel .dat { justify-content: flex-start; }
+  .kachel .dat { justify-content: flex-start; flex-wrap: wrap; }
+  .skript .trio { flex-wrap: wrap; }
   .kachel .nr { font-size: 22px; width: 38px; height: 38px; } .kachel .due { font-size: 13px; }
   .kachel .dat { grid-template-columns: 1fr; gap: 4px; }
   .kachel .big { padding: 5px 6px; font-size: 12px; gap: 6px; } .kachel .big .ic { width: 18px; height: 22px; font-size: 7px; }
