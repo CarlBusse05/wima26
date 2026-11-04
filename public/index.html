@@ -224,6 +224,30 @@ a.big:hover { border-color: var(--k); }
   .kachel .big .ic { width: 20px; height: 25px; font-size: 7px; }
 }
 @media (max-width: 640px) {
+  /* Kopfleiste: Fächer + ☰ in einer Zeile, Notizen-Auswahl darunter in einer wischbaren Zeile */
+  .bar { padding: 8px 16px; gap: 8px; }
+  .course { font-size: 15px; padding: 5px 14px; }
+  .bar .menue { order: 2; margin-left: auto; }
+  .bar .notizen-wahl { order: 3; flex: 1 0 100%; margin: 0; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+                       font-size: 13px; padding-bottom: 2px; }
+  .bar .notizen-wahl::-webkit-scrollbar { display: none; }
+  .bar .notizen-wahl button { font-size: 13px; padding: 2px 10px; flex: none; }
+  main { padding: 12px 16px 80px; }
+  #thema { left: 10px; bottom: 10px; width: 36px; height: 36px; font-size: 16px; opacity: .85; }
+  /* Board: Kacheln einer Zeile bündig und gleich hoch, Knöpfe gleich breit */
+  .zelle.frueh, .zelle.spaet { padding: 6px 0; }
+  .zelle { display: flex; padding: 6px 0; } .zelle > .kachel { flex: 1; align-content: start; }
+  /* Skript: Titel + Hochladen in einer Zeile, drei PDF-Knöpfe nebeneinander */
+  .skript .card > .top { padding: 10px 12px; gap: 8px; flex-wrap: nowrap; }
+  .skript .card .t { font-size: 17px; min-width: 0; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .skript .kind { font-size: 11px; padding: 2px 8px; }
+  .skript .top .sum:empty { display: none; }
+  .skript .upbtn { font-size: 13px; padding: 4px 10px; flex: none; }
+  .skript .trio { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 6px; }
+  .skript .trio .big { padding: 6px 6px 6px 6px; font-size: 13px; gap: 5px; min-width: 0; }
+  .skript .trio .big .ic { width: 20px; height: 25px; font-size: 7px; flex: none; }
+  .kachel .dat { flex-direction: column; align-items: stretch; }
+  .kachel .big { width: 100%; box-sizing: border-box; }
   .board { column-gap: 8px; }
   .kachel, .kachel.jetzt { grid-template-columns: 1fr; grid-template-areas: "nr" "due" "dat"; padding: 8px; row-gap: 6px; }
   .kachel .dat { justify-content: flex-start; flex-wrap: wrap; }
