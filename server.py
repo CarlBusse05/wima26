@@ -81,11 +81,11 @@ ONLINE = bool(os.environ.get("VERCEL"))
 USERS = [u.strip() for u in os.environ.get("WIMA_USERS", "Carl,Emil,Theo,Marie,Lara").split(",") if u.strip()]
 ARTEN = ["skript", "uebung", "tutorium", "sonstiges"]
 HAUPT = os.environ.get("WIMA_HAUPT") or USERS[0]  # erledigt die gemeinsamen Jobs
-ROLLEN = ["original", "musterloesung", "verbessert", "lang", "fuer", "foto", "notiz",
+ROLLEN = ["original", "musterloesung", "verbessert", "lang", "verstaendnis", "fuer", "foto", "notiz",
           "aufbereitet", "vergleich", "begleitskript", "herde", "loesungsteil", "loesung",
           "notizbasis", "notizdaten"]  # notiz*: intern fuer gemeinsame Notizen (nicht in der Dateiliste)
 NOTIZ_INTERN = ("notizbasis", "notizdaten")
-NOTIZ_FASSUNGEN = ("original", "verbessert", "lang", "loesung")
+NOTIZ_FASSUNGEN = ("original", "verbessert", "lang", "verstaendnis", "loesung")
 JOB_TYPEN = {
     # typ: Rolle der Ergebnisdateien, Ergebnis gehoert dem Nutzer (False = allen)
     "aufbereiten":       ("aufbereitet", True),

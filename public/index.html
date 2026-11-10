@@ -246,6 +246,8 @@ a.big:hover { border-color: var(--k); }
   .skript .trio { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 6px; }
   .skript .trio .big { padding: 6px 6px 6px 6px; font-size: 13px; gap: 5px; min-width: 0; }
   .skript .trio .big .ic { width: 20px; height: 25px; font-size: 7px; flex: none; }
+  /* vier Knöpfe (mit „Verständnis“) passen nicht in eine Zeile: 2 × 2 */
+  .skript .trio[style*="--n:4"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .kachel .dat { flex-direction: column; align-items: stretch; }
   .kachel .big { width: 100%; box-sizing: border-box; }
   .board { column-gap: 8px; }
@@ -289,7 +291,7 @@ const JOBS = { aufbereiten: "Lösung aufbereiten", vergleich: "Mit Musterlösung
                verbessern: "Verbessert neu erstellen", lang: "Lang neu erstellen", personalisieren: "Für mich neu erstellen",
                loesung: "Lösung neu erstellen" };
 const ROLLEN = { original: "Original", musterloesung: "Musterlösung", foto: "Meine Lösung", notiz: "Notiz",
-                 aufbereitet: "Aufbereitet", vergleich: "Vergleich", verbessert: "Verbessert", lang: "Lang", fuer: "Für mich",
+                 aufbereitet: "Aufbereitet", vergleich: "Vergleich", verbessert: "Verbessert", lang: "Lang", verstaendnis: "Verständnis", fuer: "Für mich",
                  loesungsteil: "Lösungsteil", loesung: "Lösung" };
 
 const store = {
@@ -742,10 +744,13 @@ function trio(it) {
   const orig = neueste(shared(it, "original"));
   const lang = it.art === "skript";
   const loesung = it.art === "uebung" || it.art === "tutorium";
-  return `<div class="trio" style="--n:${lang || loesung ? 3 : 2}">
+  // „Verständnis“: von Hand geschriebenes Begleitdokument zu Lang, nur sichtbar, wenn es eins gibt (bisher LinA)
+  const verst = lang ? neueste(shared(it, "verstaendnis")) : null;
+  return `<div class="trio" style="--n:${verst ? 4 : lang || loesung ? 3 : 2}">
     ${orig ? kachel("Original", orig) : `<div class="big leer drop" data-item="${it.id}" data-rolle="original" data-owner=""><span class="ic"></span>Original</div>`}
     ${kachel("Verbessert", neueste(shared(it, "verbessert")), "verbessern")}
     ${lang ? kachel("Lang", neueste(shared(it, "lang")), "lang") : ""}
+    ${verst ? kachel("Verständnis", verst) : ""}
     ${loesung ? kachel("Lösung", neueste(shared(it, "loesung")), "loesung") : ""}
   </div>`;
 }

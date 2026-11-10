@@ -83,7 +83,7 @@ export interface WimaPdf {
 }
 
 // Fassungen, die als ganzes Dokument lesbar sind (Fotos, Lösungsteile, Notizen sind Bausteine, keine Skripte)
-const ROLLEN: Record<string, string> = { original: "Original", verbessert: "Verbessert", lang: "Lang", loesung: "Lösung" };
+const ROLLEN: Record<string, string> = { original: "Original", verbessert: "Verbessert", lang: "Lang", verstaendnis: "Verständnis", loesung: "Lösung" };
 const ARTEN: Record<string, string> = { skript: "Skript", uebung: "Übung", tutorium: "Tutorium", sonstiges: "Sonstiges" };
 
 export const sourceKey = (item: number, rolle: string) => `${item}:${rolle}`;
