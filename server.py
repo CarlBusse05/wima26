@@ -43,8 +43,8 @@ Cookie "wima" oder "Authorization: Bearer <token>"; lokal zusaetzlich — nur vo
   GET    /api/wissen                     -> {dateien:{pfad: text}}  (fremde Fehlerprofile ausgenommen)
   PUT    /api/wissen?pfad=               Body = Text; nur pruefkatalog.md, kurse/**, personen/<ich>.md
 
-Automatik: Neues Original -> Job "verbessern";
-neuer/geloeschter/umgeschalteter Loesungsteil -> Job "loesung" (spaeter=1: noch kein Job, weitere
+Automatik: Neues Original -> KEIN Job mehr (seit 11.11., Carls Wunsch); "verbessern" nur noch per Knopf.
+Neuer/geloeschter/umgeschalteter Loesungsteil -> Job "loesung" (spaeter=1: noch kein Job, weitere
 Dateien folgen);
 "personalisieren" ("Fuer <Name>") ist abgeschaltet (seit 02.11.): keine neuen Jobs, offene werden nicht mehr
 abgeholt. Stattdessen gemeinsame Notizen im Leser (leser/, Tabelle notizen, Schalter „Notizen“ je Eintrag).
@@ -348,8 +348,6 @@ def save_upload(qs, data, user):
                           "VALUES(?,?,?,?,?,?,?,?,?)", (item, rolle, owner, name, mime, len(data), job, now(), prio))
         pfad = store.datei_speichern(fid, name, data, mime)
         con.execute("UPDATE files SET pfad=? WHERE id=?", (pfad, fid))
-        if rolle == "original" and not job:
-            queue_job(con, item, "verbessern", HAUPT)
         if rolle == "loesungsteil" and not qs.get("spaeter"):
             queue_job(con, item, "loesung", HAUPT)
         return one(con.execute("SELECT * FROM files WHERE id=?", (fid,)))
